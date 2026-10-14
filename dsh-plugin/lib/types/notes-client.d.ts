@@ -49,6 +49,7 @@ export declare class NotesClient {
     private apiJson;
     /** 用用户名/密码向 /api/auth/skill-token 申请稳定 Token（仅内存，不落盘）。 */
     private requestSkillToken;
+    private nativeHeaders;
     /** 解析可用 Token：显式 Token 优先，否则用账号密码申请并缓存。 */
     resolveToken(signal?: AbortSignal): Promise<string>;
     private loadWorkspace;

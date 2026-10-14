@@ -1,3 +1,4 @@
+import { appFetch as fetch } from "./fnos-client.js";
 export interface WechatConfiguration {
   appId: string;
   appSecret: string;

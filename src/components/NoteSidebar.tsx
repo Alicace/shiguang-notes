@@ -1,3 +1,4 @@
+import { appPath } from "../lib/fnos-client.js";
 import {
   closestCenter,
   DndContext,
@@ -108,7 +109,7 @@ function NoteDragOverlay({ note }: { note: NoteDocument }) {
         </div>
         <span className="note-list-pin">
           <img
-            src="/smartisan/mobile/icon_top_normal.png"
+            src={appPath("/smartisan/mobile/icon_top_normal.png")}
             alt=""
             draggable={false}
           />
@@ -389,6 +390,7 @@ function SortableNoteListItem({
             <button
               type="button"
               className="note-list-pin"
+              data-diag-action="note.pin"
               aria-label={
                 pinned
                   ? `取消置顶：${getNoteTitle(note.markdown)}`
@@ -401,8 +403,8 @@ function SortableNoteListItem({
               <img
                 src={
                   pinned
-                    ? "/smartisan/mobile/icon_top_checked.png"
-                    : "/smartisan/mobile/icon_top_normal.png"
+                    ? appPath("/smartisan/mobile/icon_top_checked.png")
+                    : appPath("/smartisan/mobile/icon_top_normal.png")
                 }
                 alt=""
                 aria-hidden="true"
@@ -412,6 +414,7 @@ function SortableNoteListItem({
             <button
               type="button"
               className={`note-list-star${note.isStarred ? " is-starred" : ""}`}
+              data-diag-action="note.star"
               aria-label={
                 note.isStarred
                   ? `取消加星：${getNoteTitle(note.markdown)}`
@@ -628,7 +631,7 @@ export function NoteSidebar({
                   <img
                     key={`clip-${note.id}`}
                     className="note-list-clip"
-                    src="/smartisan/mobile/note_item_clip_normal.png"
+                    src={appPath("/smartisan/mobile/note_item_clip_normal.png")}
                     alt=""
                     draggable={false}
                   />

@@ -12,6 +12,8 @@ case "${wizard_m0_data:-keep}" in
       case "$NAME" in ''|*[!0-9]*) continue ;; esac
       if [ -f "$FILE" ]; then rm -f -- "$FILE"; fi
     done
+    rm -rf -- "$TRIM_PKGVAR/data" "$TRIM_PKGVAR/images"
+    rm -f -- "$TRIM_PKGVAR/runtime-config.json" "$TRIM_PKGVAR/session-secret"
     ;;
   *) exit 1 ;;
 esac

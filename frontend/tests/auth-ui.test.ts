@@ -129,7 +129,7 @@ test("superadmin 路由、用户管理和首页云同步入口保持连通", () 
     /className="account-menu-item account-menu-logout"/,
   );
   assert.match(appSource, /<LoginDialog/);
-  assert.match(appSource, /const \[requireLogin, setRequireLogin\] = useState\(false\)/);
+  assert.match(appSource, /const \[requireLogin, setRequireLogin\] = useState\(isNative\)/);
   assert.match(appSource, /const authState = await getAuthState\(\)/);
   assert.match(
     appSource,

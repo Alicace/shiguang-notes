@@ -1,3 +1,4 @@
+import { appPath } from "../lib/fnos-client.js";
 import { useState, type FormEvent } from "react";
 import type { AuthUser } from "../lib/auth.js";
 
@@ -73,7 +74,7 @@ export function LoginDialog({
 
         <img
           className="login-dialog-logo"
-          src="/header/logo.png"
+          src={appPath("/header/logo.png")}
           alt=""
           width="72"
           height="72"

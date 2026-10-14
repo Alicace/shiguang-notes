@@ -1,0 +1,34 @@
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const packageDir = path.join(root, "fnnotes-m0");
+const app = path.join(packageDir, "app");
+const metadata = JSON.parse(readFileSync(path.join(root, "src/native/metadata.json")));
+function run(command, args, env = process.env) { const result = spawnSync(command, args, { cwd: root, env, stdio: "inherit" }); if (result.error || result.status !== 0) throw result.error || new Error("原生构建失败。"); }
+run(process.execPath, ["node_modules/typescript/bin/tsc", "--noEmit", "-p", "tsconfig.json"]);
+run(process.execPath, ["node_modules/typescript/bin/tsc", "-p", "tsconfig.server.json"]);
+run(process.execPath, ["node_modules/vite/bin/vite.js", "build"], { ...process.env, VITE_FNOS_NATIVE: "1" });
+cpSync(path.join(root, "dist/fnos/m0/ui/auth-callback.html"), path.join(root, "dist/auth-callback.html"));
+for (const folder of ["web", "server", "dist", "dist-server", "node_modules", "public", "src", "skills"]) rmSync(path.join(app, folder), { recursive: true, force: true });
+mkdirSync(path.join(app, "server"), { recursive: true });
+cpSync(path.join(root, "fnos/native/main.mjs"), path.join(app, "server/main.mjs"));
+for (const folder of ["dist", "dist-server", "public", "src/assets/fonts", "skills/notes-workspace-api", "skills/notes-export-api"]) cpSync(path.join(root, folder), path.join(app, folder), { recursive: true });
+for (const filename of ["LICENSE", "NOTICE"]) cpSync(path.join(root, filename), path.join(app, filename));
+// 开发机模拟器与测试浏览器不进入原生包；Linux Sharp 运行依赖必须独立准备。
+const runtime = process.env.FNOS_RUNTIME_DIR || path.resolve(root, "../.tools/native-runtime-linux");
+if (!existsSync(path.join(runtime, "node_modules/sharp/package.json"))) throw new Error("缺少 Linux x64 原生运行依赖，请先准备 FNOS_RUNTIME_DIR。");
+cpSync(path.join(runtime, "node_modules"), path.join(app, "node_modules"), { recursive: true });
+// 七牛将 TypeScript 编译器列为生产依赖，但其发布的 JS 不在运行时调用它。
+rmSync(path.join(app, "node_modules/typescript"), { recursive: true, force: true });
+for (const filename of readdirSync(path.join(packageDir, "cmd"))) chmodSync(path.join(packageDir, "cmd", filename), 0o755);
+let manifest = readFileSync(path.join(packageDir, "manifest"), "utf8");
+manifest = manifest.replace(/^version\s*=.*$/m, "version=" + metadata.appVersion).replace(/^desc\s*=.*$/m, "desc=拾光便签完整上游界面与业务适配：飞牛账号、私有与共享空间、七种主题、客户端PNG和本地诊断。外部服务需配置，平台能力待真机验收。");
+writeFileSync(path.join(packageDir, "manifest"), manifest);
+writeFileSync(path.join(app, "build-info.json"), JSON.stringify({ ...metadata, png: "client", nasVerified: false }, null, 2));
+writeFileSync(path.join(app, "package.json"), JSON.stringify({ type: "module", private: true, version: metadata.appVersion }));
+function clean(dir) { for (const item of readdirSync(dir, { withFileTypes: true })) { const target = path.join(dir, item.name); if (item.name === ".DS_Store") rmSync(target); else if (item.isDirectory()) clean(target); } }
+clean(packageDir);
+if (process.argv.includes("--pack")) run(process.env.FN_PACK_BIN || path.resolve(root, "../.tools/fnpack-1.2.3-darwin-arm64"), ["build", "--directory", packageDir]);

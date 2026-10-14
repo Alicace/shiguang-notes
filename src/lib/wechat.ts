@@ -1,3 +1,4 @@
+import { appFetch as fetch } from "./fnos-client.js";
 import type { NoteCardThemeId } from "../types/app.js";
 
 interface WechatPreparationResult {

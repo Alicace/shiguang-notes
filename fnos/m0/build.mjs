@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const packageDir = path.join(root, "fnnotes-m0");
+const metadata = JSON.parse(readFileSync(path.join(root, "fnos/m0/metadata.json")));
+const manifestVersion = readFileSync(path.join(packageDir, "manifest"), "utf8").match(/^version\s*=\s*(.+)$/m)?.[1].trim();
+if (manifestVersion !== metadata.appVersion) throw new Error("manifest 与 M0 版本不一致。");
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
   if (result.error || result.status !== 0) throw result.error || new Error(`${command} 失败。`);
@@ -17,10 +20,10 @@ for (const folder of ["web", "server"]) {
   rmSync(target, { recursive: true, force: true }); mkdirSync(target, { recursive: true });
 }
 cpSync(path.join(root, "fnos/m0/dist"), path.join(packageDir, "app/web"), { recursive: true });
-for (const file of ["server.mjs", "main.mjs"]) cpSync(path.join(root, "fnos/m0", file), path.join(packageDir, "app/server", file));
+for (const file of ["server.mjs", "main.mjs", "metadata.json"]) cpSync(path.join(root, "fnos/m0", file), path.join(packageDir, "app/server", file));
 for (const file of ["LICENSE", "NOTICE"]) cpSync(path.join(root, file), path.join(packageDir, "app", file));
 const projectVersion = JSON.parse(readFileSync(path.join(root, "package.json"))).version;
-writeFileSync(path.join(packageDir, "app/build-info.json"), JSON.stringify({ appVersion: "0.1.0", upstreamVersion: projectVersion, upstreamCommit: "6a9b6a3f02a3dd189117bd511d840e44e0c665d5", png: "client", nativeRuntime: "nodejs_v22", stage: "M0", nasVerified: false }, null, 2));
+writeFileSync(path.join(packageDir, "app/build-info.json"), JSON.stringify({ ...metadata, upstreamVersion: projectVersion, png: "client", nativeRuntime: "nodejs_v22", nasVerified: false }, null, 2));
 function removeFinderMetadata(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const file = path.join(directory, entry.name);

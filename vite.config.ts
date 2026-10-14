@@ -4,7 +4,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  base: "/",
+  base: process.env.VITE_FNOS_NATIVE === "1" ? "/app/fnnotes-m0/" : "/",
+  resolve: process.env.VITE_FNOS_NATIVE === "1" ? { alias: { "/callback.ts": path.resolve("fnos/m0/ui/callback.ts") } } : undefined,
   plugins: [
     react(),
     {
@@ -24,6 +25,7 @@ export default defineConfig({
       },
     },
   ],
+  build: process.env.VITE_FNOS_NATIVE === "1" ? { rollupOptions: { input: { main: path.resolve("index.html"), callback: path.resolve("fnos/m0/ui/auth-callback.html") } } } : undefined,
   server: {
     host: true,
     allowedHosts: true,

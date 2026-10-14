@@ -15,12 +15,16 @@ export declare const Config: z<Schemastery.ObjectS<{
     token: z<string, string>;
     username: z<string, string>;
     password: z<string, string>;
+    nasCookie: z<string, string>;
+    space: z<string, string>;
     demoServer: z<string, string>;
 }>, Schemastery.ObjectT<{
     baseUrl: z<string, string>;
     token: z<string, string>;
     username: z<string, string>;
     password: z<string, string>;
+    nasCookie: z<string, string>;
+    space: z<string, string>;
     demoServer: z<string, string>;
 }>>;
 export declare function apply(ctx: Context, config: Config): void;

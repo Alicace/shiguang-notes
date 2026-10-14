@@ -33,6 +33,8 @@ export interface SaveWorkspaceBody {
 }
 /** 插件读取到的服务配置。 */
 export interface NotesServiceConfig {
+    nasCookie?: string;
+    space?: string;
     baseUrl?: string;
     token?: string;
     username?: string;

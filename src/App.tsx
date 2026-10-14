@@ -89,6 +89,11 @@ import type {
   NoteFolder,
   NoteWorkspace,
 } from "./types/app";
+import { appPath, isNative, nativeWritable } from "./lib/fnos-client";
+import { collectPageEvents, recorder } from "../fnos/m0/ui/diagnostics";
+import nativeMetadata from "./native/metadata.json";
+import { featureInventory } from "./native/features";
+import { resetNativeTestResults } from "./native/NativeSettings";
 
 type MobileWorkspaceView = "notes" | "editor" | "preview";
 type DesktopWorkspaceView = "editor" | "preview";
@@ -231,10 +236,10 @@ function formatMobileNoteUpdatedAt(timestamp: number | undefined): string {
 
 export default function App() {
   const renderMode = getRenderMode();
-  const isPlaywrightRender = renderMode === "playwright";
+  const isPlaywrightRender = !isNative && renderMode === "playwright";
   const isTestDataMode = isSmartisanWebTestDataMode();
-  const [footerBrand, setFooterBrand] = useState(getInitialFooterBrand);
-  const [footerLogoUrl, setFooterLogoUrl] = useState(getInitialFooterLogoUrl);
+  const [footerBrand, setFooterBrand] = useState(() => isNative && getInitialFooterBrand() === "由开源版锤子便签发送" ? "由拾光便签发送" : getInitialFooterBrand());
+  const [footerLogoUrl, setFooterLogoUrl] = useState(() => appPath(getInitialFooterLogoUrl()));
   const [footerVia, setFooterVia] = useState(getInitialFooterVia);
   const [aiEnabled, setAiEnabled] = useState(getInitialAiEnabled);
   const [aiAvailable, setAiAvailable] = useState(false);
@@ -258,7 +263,10 @@ export default function App() {
   const [isDesktopFocusMode, setIsDesktopFocusMode] = useState(false);
   const [isDesktopSharePreview, setIsDesktopSharePreview] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [requireLogin, setRequireLogin] = useState(false);
+  const [requireLogin, setRequireLogin] = useState(isNative);
+  const [nativeReadOnly, setNativeReadOnly] = useState(false);
+  const [nativeSwitching, setNativeSwitching] = useState(false);
+  const cloudFailureRef = useRef(false);
   const [authStatus, setAuthStatus] = useState<"loading" | "ready">("loading");
   const [cloudSyncState, setCloudSyncState] = useState<
     "local" | "syncing" | "synced" | "failed"
@@ -314,6 +322,7 @@ export default function App() {
     cloudSaveQueueRef.current = createCloudSaveQueue({
       save: saveCloudWorkspace,
       onSaved: (stored) => {
+        cloudFailureRef.current = false;
         cloudRevisionRef.current = stored.updatedAt ?? Date.now();
 
         // 队列里还有更新的快照或新的防抖定时器时保持“同步中”，
@@ -332,6 +341,7 @@ export default function App() {
         setCloudSyncState("synced");
       },
       onError: (error) => {
+        cloudFailureRef.current = true;
         setCloudSyncError(
           error instanceof Error ? error.message : "云端便签保存失败。",
         );
@@ -377,6 +387,31 @@ export default function App() {
   const toggleStarred = useAppStore((state) => state.toggleStarred);
   const clearPendingAction = useAppStore((state) => state.clearPendingAction);
   const confirmPendingAction = useAppStore((state) => state.confirmPendingAction);
+
+  useEffect(() => {
+    if (!isNative) return;
+    recorder.configure(nativeMetadata, featureInventory.map((item) => item.id));
+    const dispose = collectPageEvents();
+    const identityChanged = () => resetAuthenticatedClientState();
+    const workspaceLoaded = () => setNativeReadOnly(!nativeWritable);
+    window.addEventListener("shiguang-identity-changed", identityChanged);
+    window.addEventListener("shiguang-workspace-loaded", workspaceLoaded);
+    return () => { dispose(); recorder.setEnabled(false); window.removeEventListener("shiguang-identity-changed", identityChanged); window.removeEventListener("shiguang-workspace-loaded", workspaceLoaded); };
+  }, []);
+
+  async function changeNativeSpace(scope: string) {
+    if (nativeSwitching) return;
+    setNativeSwitching(true);
+    try {
+      const pendingSave = cloudSaveTimeoutRef.current !== null || cloudSaveQueueRef.current?.isSaving() || cloudSyncState === "syncing";
+      if (cloudSaveTimeoutRef.current !== null) { clearTimeout(cloudSaveTimeoutRef.current); cloudSaveTimeoutRef.current = null; }
+      if (!nativeReadOnly && pendingSave) { cloudSaveQueueRef.current?.enqueue(getCurrentWorkspace()); await cloudSaveQueueRef.current?.whenIdle(); }
+      if (!nativeReadOnly && cloudFailureRef.current) throw new Error("当前空间保存失败，请先处理同步错误再切换。");
+      recorder.action("space.switch");
+      const url = new URL(location.href); if (scope) url.searchParams.set("space", scope); else url.searchParams.delete("space"); url.hash = "";
+      location.assign(url.toString());
+    } finally { setNativeSwitching(false); }
+  }
 
   const categoryNoteDocuments = useMemo(
     () => getCategoryNoteDocuments(noteDocuments, activeCategoryId),
@@ -581,6 +616,7 @@ export default function App() {
     if (authStatus !== "ready" || !canUseCloudWorkspace(authUser)) {
       return;
     }
+    if (isNative && !nativeWritable) return;
 
     if (cloudHydratedUserIdRef.current !== authUser.id) {
       return;
@@ -615,6 +651,7 @@ export default function App() {
     }
 
     const hasPendingLocalSave = () =>
+      (isNative && cloudFailureRef.current) ||
       cloudSaveTimeoutRef.current !== null ||
       cloudSaveQueueRef.current?.isSaving() === true;
 
@@ -1286,6 +1323,7 @@ export default function App() {
   }
 
   function resetAuthenticatedClientState() {
+    if (isNative) { recorder.setEnabled(false); resetNativeTestResults(); }
     if (cloudSaveTimeoutRef.current !== null) {
       window.clearTimeout(cloudSaveTimeoutRef.current);
       cloudSaveTimeoutRef.current = null;
@@ -1307,6 +1345,7 @@ export default function App() {
   }
 
   async function handleLogout() {
+    if (isNative) { window.open(location.origin, "_blank", "noopener"); return; }
     if (
       canUseCloudWorkspace(authUser) &&
       cloudHydratedUserIdRef.current === authUser.id
@@ -1482,6 +1521,7 @@ export default function App() {
   }
 
   async function handleCopyMarkdown() {
+    recorder.action("copy.markdown");
     try {
       await copyTextToClipboard(normalizeClipboardMarkdown(markdown));
       setCopyState("copied");
@@ -1492,6 +1532,7 @@ export default function App() {
   }
 
   async function handleCopyWechat() {
+    recorder.action("copy.wechat");
     if (wechatCopyState === "preparing") {
       return;
     }
@@ -1772,6 +1813,7 @@ export default function App() {
   }
 
   function handleSettingsToggle() {
+    recorder.action("settings.open");
     setIsCategorySidebarOpen(false);
     setIsShareOpen(false);
     setIsAccountMenuOpen(false);
@@ -1809,12 +1851,10 @@ export default function App() {
           }
         }}
       >
-        <span className="auth-trigger-dot" aria-hidden="true" />
-        <span className="auth-trigger-label">
-          {authStatus === "loading"
-            ? "检查登录..."
-            : authUser?.username ?? "登录锤子便签"}
-        </span>
+        {isNative && authUser ? <>
+          <span className="settings-account-avatar native-account-avatar" aria-hidden="true">{Array.from(authUser.username.trim())[0]?.toLocaleUpperCase()}</span>
+          <span className="native-account-copy"><span className="auth-trigger-label">{authUser.username}</span><span className="native-account-status"><span className="auth-trigger-dot" aria-hidden="true" />{cloudSyncState === "syncing" ? "正在同步" : cloudSyncState === "failed" ? "同步异常" : "已登录 · 已同步"}</span></span>
+        </> : <><span className="auth-trigger-dot" aria-hidden="true" /><span className="auth-trigger-label">{authStatus === "loading" ? "检查登录..." : authUser?.username ?? "登录锤子便签"}</span></>}
       </button>
 
       {authUser && isAccountMenuOpen ? (
@@ -1840,7 +1880,7 @@ export default function App() {
               进入管理后台
             </a>
           ) : null}
-          {authUser.role === "user" ? (
+          {!isNative && authUser.role === "user" ? (
             <button
               type="button"
               className="account-menu-item"
@@ -1859,7 +1899,7 @@ export default function App() {
             role="menuitem"
             onClick={() => void handleLogout()}
           >
-            退出登录
+            {isNative ? "前往飞牛管理账号" : "退出登录"}
           </button>
         </div>
       ) : null}
@@ -1877,7 +1917,8 @@ export default function App() {
       aiAvailable={aiAvailable}
       aiEnabled={aiEnabled}
       authUsername={authUser?.username}
-      canChangePassword={authUser?.role === "user"}
+      canChangePassword={!isNative && authUser?.role === "user"}
+      onNativeSpaceChange={changeNativeSpace}
       canConfigureWechat={Boolean(authUser)}
       cloudStatusLabel={
         canUseCloudWorkspace(authUser)
@@ -1935,6 +1976,7 @@ export default function App() {
   }
 
   if (!isPlaywrightRender && requireLogin && !authUser) {
+    if (isNative) return <main className="required-login-page"><h1>拾光便签</h1><p>请使用当前 NAS 的飞牛登录态打开应用。应用不收集或验证 NAS 密码。</p><p>{cloudSyncError}</p><button onClick={() => location.reload()}>重新确认飞牛身份</button></main>;
     return (
       <main className="required-login-page" data-require-login="true">
         <LoginDialog
@@ -1947,8 +1989,10 @@ export default function App() {
 
   return (
     <>
+      {isNative && !isSettingsOpen && <div className="native-scope-label">{nativeReadOnly ? "共享空间 · 只读" : new URLSearchParams(location.search).has("space") ? "共享空间 · 可编辑" : "私有便签"}</div>}
       <div
         className="app-layout"
+        data-fnos-native={isNative ? "true" : undefined}
         data-theme={resolvedTheme}
         data-theme-preference={selectedTheme}
         data-authenticated={authUser ? "true" : "false"}
@@ -1999,11 +2043,11 @@ export default function App() {
                 onClick={handleSettingsToggle}
               >
                 <span className="app-brand-mark" aria-hidden="true">
-                  <img src="/header/logo.png" alt="" />
+                  <img src={appPath("/header/logo.png")} alt="" />
                 </span>
               </button>
               <div className="app-brand-copy">
-                <span className="app-brand-title">锤子便签</span>
+                <span className="app-brand-title">{isNative ? "拾光便签" : "锤子便签"}</span>
               </div>
             </div>
 
@@ -2124,7 +2168,7 @@ export default function App() {
                     <button
                       type="button"
                       className="share-trigger"
-                      aria-label={isShareOpen ? "关闭分享与导出" : "打开分享与导出"}
+                      aria-label={isShareOpen || isDesktopSharePreview ? "关闭分享与导出" : "打开分享与导出"}
                       aria-controls="app-share-panel"
                       aria-expanded={isShareOpen}
                       title="分享与导出"
@@ -2242,7 +2286,7 @@ export default function App() {
                   onClick={handleSettingsToggle}
                 >
                   <img
-                    src="/smartisan/mobile/btn_settings.png"
+                    src={appPath("/smartisan/mobile/btn_settings.png")}
                     alt=""
                     aria-hidden="true"
                     draggable={false}
@@ -2474,6 +2518,7 @@ export default function App() {
             markdown={markdown}
             onImageImportingChange={setIsImportingImage}
             onMarkdownChange={setMarkdown}
+            readOnly={nativeReadOnly || nativeSwitching}
           />
 
           <PreviewPanel
@@ -2485,7 +2530,7 @@ export default function App() {
             noteCardTheme={noteCardTheme}
             onFooterBrandChange={setFooterBrand}
             onFooterViaChange={setFooterVia}
-            onNoteCardThemeChange={setNoteCardThemeOverride}
+            onNoteCardThemeChange={(theme) => { recorder.action("theme.change"); setNoteCardThemeOverride(theme); }}
           />
 
           <div className="category-empty-workspace" role="status">

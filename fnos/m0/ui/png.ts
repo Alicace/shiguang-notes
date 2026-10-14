@@ -1,4 +1,4 @@
-import { toBlob } from "html-to-image";
+import { getFontEmbedCSS, toBlob } from "html-to-image";
 
 export interface PngPage { blob: Blob; url: string; filename: string }
 export function pageRanges(height: number, boundaries: number[], limit = 900): Array<[number, number]> {
@@ -32,8 +32,9 @@ export async function renderPng(node: HTMLElement, signal: AbortSignal): Promise
   checkCancelled(signal);
   const height = Math.ceil(node.getBoundingClientRect().height);
   const top = node.getBoundingClientRect().top;
-  const boundaries = Array.from(node.querySelectorAll(".note-content > *, .note-footer")).map((element) => Math.floor(element.getBoundingClientRect().top - top)).sort((a, b) => a - b);
+  const boundaries = Array.from(node.querySelectorAll(".note-content > *, .note-footer, .note-section, .sheet-footer")).map((element) => Math.floor(element.getBoundingClientRect().top - top)).sort((a, b) => a - b);
   const ranges = pageRanges(height, boundaries);
+  const fontEmbedCSS = await getFontEmbedCSS(node);
   const pages: PngPage[] = [];
   const stamp = Date.now();
   try {
@@ -42,13 +43,17 @@ export async function renderPng(node: HTMLElement, signal: AbortSignal): Promise
       const [start, end] = ranges[i];
       const frame = document.createElement("div");
       Object.assign(frame.style, { position: "fixed", left: "-10000px", top: "0", width: "720px", height: `${end - start}px`, overflow: "hidden", background: getComputedStyle(node).backgroundColor });
+      const themeBoundary = node.closest<HTMLElement>(".preview-card-theme[data-preview-theme]");
+      if (themeBoundary) { frame.className = "preview-card-theme"; frame.dataset.previewTheme = themeBoundary.dataset.previewTheme; }
+      const computed = getComputedStyle(node);
+      for (const property of computed) if (property.startsWith("--")) frame.style.setProperty(property, computed.getPropertyValue(property));
       const clone = node.cloneNode(true) as HTMLElement;
       clone.removeAttribute("id");
       Object.assign(clone.style, { width: "720px", margin: "0", transform: `translateY(-${start}px)` });
       frame.append(clone);
       document.body.append(frame);
       try {
-        const blob = await toBlob(frame, { width: 720, height: end - start, pixelRatio: 2, style: { position: "static" }, skipFonts: true });
+        const blob = await toBlob(frame, { width: 720, height: end - start, pixelRatio: 2, style: { position: "static" }, fontEmbedCSS });
         checkCancelled(signal);
         if (!blob) throw new Error("浏览器没有生成 PNG，请重试。");
         pages.push({ blob, url: URL.createObjectURL(blob), filename: `拾光便签-${stamp}-${i + 1}.png` });

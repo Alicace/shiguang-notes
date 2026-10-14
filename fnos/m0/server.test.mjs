@@ -122,3 +122,15 @@ test("生产入口拒绝 root 运行", () => {
   assert.throws(() => assertNonRoot(0), /root/);
   assert.doesNotThrow(() => assertNonRoot(1000));
 });
+
+test("程序信息必须鉴权，只返回固定字段，不含用户、存储路径或运行凭据", async (t) => {
+  const { send, dir } = await fixture(t);
+  assert.equal((await send("/api/program-info", { headers: {} })).status, 401);
+  const result = await send("/api/program-info");
+  assert.equal(result.status, 200);
+  assert.deepEqual(Object.keys(result.data).sort(), ["appVersion", "nodeVersion", "simulation", "stage", "systemApiConfigured"]);
+  assert.equal(result.data.appVersion, "0.1.1");
+  assert.equal(result.data.stage, "M0");
+  assert.match(result.data.nodeVersion, /^\d+\.\d+\.\d+$/);
+  for (const text of ["user-a", "1001", "csrfToken", dir, "Authorization"]) assert.ok(!result.text.includes(text));
+});

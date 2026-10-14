@@ -27,7 +27,11 @@
     "fnos:m0:build": "node fnos/m0/build.mjs",
     "fnos:m0:pack": "node fnos/m0/build.mjs --pack",
     "fnos:m0:dev": "node fnos/m0/dev.mjs",
-    "fnos:m0:test": "node --test fnos/m0/server.test.mjs && node --import tsx --test fnos/m0/png.test.ts"
+    "fnos:build": "node fnos/native/build.mjs",
+    "fnos:pack": "node fnos/native/build.mjs --pack",
+    "fnos:dev": "node fnos/native/dev.mjs",
+    "fnos:test": "node --test --test-concurrency=1 fnos/native/*.test.mjs && node --import tsx --test fnos/m0/png.test.ts fnos/m0/diagnostics.test.ts",
+    "fnos:m0:test": "node --test fnos/m0/server.test.mjs && node --import tsx --test fnos/m0/png.test.ts fnos/m0/diagnostics.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -1,4 +1,7 @@
 import { create } from "zustand";
+import { isNative, nativeWritable } from "../lib/fnos-client";
+import { recorder } from "../../fnos/m0/ui/diagnostics";
+const editable = () => !isNative || nativeWritable;
 import { getInitialNoteWorkspace, getInitialTheme } from "../lib/app-state";
 import {
   createNoteFolder,
@@ -82,6 +85,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   copyState: "idle",
   pendingAction: null,
   createNote: (markdown = "", folderId = null, isStarred = false) => {
+    if (!editable()) return get().activeNoteId;
+    recorder.action("note.create");
     let createdNoteId = "";
 
     set((state) => {
@@ -110,7 +115,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     return createdNoteId;
   },
   discardEmptyDraft: (noteId, preferredNextNoteId) =>
-    set((state) => {
+    editable() && set((state) => {
       const discarded = discardEmptyNoteDraft(
         state.notes,
         noteId,
@@ -136,6 +141,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       };
     }),
   createFolder: (name) => {
+    if (!editable()) return null;
+    recorder.action("folder.create");
     const normalizedName = name.trim();
 
     if (!normalizedName) {
@@ -157,7 +164,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     return folder.id;
   },
   deleteFolder: (folderId) =>
-    set((state) => ({
+    editable() && set((state) => ({
       folders: state.folders.filter((folder) => folder.id !== folderId),
       notes: state.notes.map((note) =>
         note.folderId === folderId
@@ -169,6 +176,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       ),
     })),
   selectNote: (noteId) => {
+    recorder.action("note.select");
     const note = getNoteDocumentById(get().notes, noteId);
 
     if (!note) {
@@ -183,6 +191,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     });
   },
   requestDeleteNote: (noteId) => {
+    if (!editable()) return;
+    recorder.action("note.delete");
     const note = get().notes.find((candidate) => candidate.id === noteId);
 
     if (!note) {
@@ -200,6 +210,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     });
   },
   requestPermanentlyDeleteNote: (noteId) => {
+    if (!editable()) return;
     const note = get().notes.find((candidate) => candidate.id === noteId);
 
     if (!note || note.deletedAt === null) {
@@ -237,11 +248,11 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       };
     }),
   restoreNote: (noteId) =>
-    set((state) => ({
+    editable() && set((state) => ({
       notes: restoreNoteFromTrash(state.notes, noteId),
     })),
   reorderNotes: (activeNoteId, overNoteId) =>
-    set((state) => ({
+    editable() && set((state) => ({
       notes: reorderNormalNoteDocuments(
         state.notes,
         activeNoteId,
@@ -249,7 +260,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       ),
     })),
   moveNoteToFolder: (noteId, folderId) =>
-    set((state) => {
+    editable() && set((state) => {
       const isKnownFolder =
         folderId === null || state.folders.some((folder) => folder.id === folderId);
 
@@ -260,7 +271,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         : {};
     }),
   setMarkdown: (markdown) =>
-    set((state) => {
+    editable() && set((state) => {
       const updatedAt = Date.now();
       return {
         markdown,
@@ -280,15 +291,15 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   setExportError: (exportError) => set({ exportError }),
   setCopyState: (copyState) => set({ copyState }),
   togglePinned: (noteId) =>
-    set((state) => ({
+    editable() && set((state) => ({
       notes: toggleNotePinned(state.notes, noteId),
     })),
   toggleStarred: (noteId) =>
-    set((state) => ({
+    editable() && set((state) => ({
       notes: toggleNoteStarred(state.notes, noteId),
     })),
   requestReplaceMarkdown: (nextMarkdown, title, description) =>
-    set((state) => ({
+    editable() && set((state) => ({
       pendingAction: {
         kind: "replace-markdown",
         noteId: state.activeNoteId,
@@ -300,6 +311,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     })),
   clearPendingAction: () => set({ pendingAction: null }),
   confirmPendingAction: () => {
+    if (!editable()) return;
     const { activeNoteId, notes, pendingAction } = get();
 
     if (!pendingAction) {

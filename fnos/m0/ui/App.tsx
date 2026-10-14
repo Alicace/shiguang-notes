@@ -3,6 +3,8 @@ import { TrimApp } from "@trimjs/web-app";
 import { MarkdownText } from "../../../src/components/MarkdownText.js";
 import { api, ApiError, AUTH_STATE_KEY, BASE, writeOptions, type Session, type Workspace } from "./api";
 import { renderPng, savePng, type PngPage } from "./png";
+import { DiagnosticsPanel } from "./DiagnosticsPanel";
+import { recorder } from "./diagnostics";
 
 const sample = "# 我的第一篇便签\n\n这是拾光便签的原生预检版。\n\n- 使用当前 NAS 用户保存正文\n- 在应用内生成 PNG\n- 图片直接保存到本机\n\n> 先验证平台能力，再接入完整便签与共享空间。";
 const message = (error: unknown) => error instanceof Error ? error.message : "操作失败，请重试。";
@@ -43,6 +45,7 @@ export function App() {
         const next = await api<Session>("session");
         if (disposed) return;
         if (hydratedUid.current !== next.user.uid) {
+          recorder.setEnabled(false);
           controller.current?.abort();
           setPages([]); setFolders([]); setText(""); setDirty(false); setLoaded(false);
           const uid = next.user.uid;
@@ -56,7 +59,7 @@ export function App() {
         } else { sessionRef.current = next; setSession(next); }
       } catch (error) {
         if (disposed) return;
-        if (error instanceof ApiError && error.status === 401) { controller.current?.abort(); sessionRef.current = null; hydratedUid.current = null; setSession(null); setText(""); setPages([]); setLoaded(false); }
+        if (error instanceof ApiError && error.status === 401) { recorder.setEnabled(false); controller.current?.abort(); sessionRef.current = null; hydratedUid.current = null; setSession(null); setText(""); setPages([]); setLoaded(false); }
         setStatus(message(error));
       }
     }
@@ -84,10 +87,11 @@ export function App() {
     let next: Session;
     try { next = await api<Session>("session"); }
     catch (error) {
-      if (error instanceof ApiError && error.status === 401) { clearImages(); sessionRef.current = null; hydratedUid.current = null; setSession(null); setText(""); setLoaded(false); }
+      if (error instanceof ApiError && error.status === 401) { recorder.setEnabled(false); clearImages(); sessionRef.current = null; hydratedUid.current = null; setSession(null); setText(""); setLoaded(false); }
       throw error;
     }
     if (!sessionRef.current || next.user.uid !== sessionRef.current.user.uid) {
+      recorder.setEnabled(false);
       clearImages(); sessionRef.current = null; hydratedUid.current = null; setSession(null); setText(""); setFolders([]); setDirty(false); setLoaded(false);
       throw new Error("账号已变化，请重新加载便签。");
     }
@@ -117,7 +121,7 @@ export function App() {
       if (!node) throw new Error("预览尚未就绪。");
       const result = await renderPng(node, abort.signal);
       setPages(result); setStatus(`PNG 已在本机生成，共 ${result.length} 张。`);
-    } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setStatus(message(error)); }
+    } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) { recorder.error(error instanceof Error ? error.name : "Error"); setStatus(message(error)); } }
     finally { setExporting(false); }
   }
 
@@ -159,10 +163,11 @@ export function App() {
   return <main>
     <header className="app-header"><img src={BASE + "note-icon.png"} width="42" height="42" alt="" /><div><h1>拾光便签</h1><p>原生预检版 · M0</p></div><span className="identity">{session ? `${session.user.username} · UID ${session.user.uid}${session.user.isAdmin ? " · 管理员" : ""}` : "等待系统身份"}</span></header>
     <aside className="notice">{session?.simulation ? "当前使用开发机模拟网关，不代表飞牛登录或授权已经通过验证。" : "此版本用于验证系统身份、用户保存、文件授权和本机 PNG；完整便签与共享空间尚未接入。"}</aside>
-    <div className="toolbar"><button onClick={() => { void save().catch(() => {}); }} disabled={!loaded || busy || exporting}>{busy ? "正在保存…" : "保存便签"}</button><button onClick={() => { void generate(); }} disabled={!loaded || busy || exporting}>{exporting ? "正在生成…" : "生成 PNG"}</button><label>便签主题<select value={theme} onChange={(event) => { clearImages(); setTheme(event.target.value); }}><option value="paper">暖白纸面</option><option value="night">深色便签</option></select></label><span role="status">{status}{dirty ? " · 有未保存修改" : ""}</span></div>
-    {session ? <div className="workspace"><section className="editor"><h2>编辑便签</h2><textarea aria-label="便签正文" value={text} maxLength={50_000} disabled={!loaded || busy || exporting} onChange={(event) => { clearImages(); setText(event.target.value); setDirty(true); }} /></section><section className="preview"><h2>便签预览</h2><Note text={text} theme={theme} /></section></div> : <section className="empty"><p>请通过飞牛桌面入口打开应用。预检版不提供独立密码登录。</p></section>}
-    {pages.length > 0 && <section className="png-result"><h2>导出预览 · {pages.length} 张</h2><p>PNG 已在当前设备生成。选择图片保存，取消保存不会改变便签。</p><div className="png-grid">{pages.map((page, i) => <div key={page.filename}><img src={page.url} alt={`导出预览第 ${i + 1} 张`} /><button onClick={() => { void savePng(page).catch((error) => setStatus(message(error))); }}>保存第 {i + 1} 张 PNG</button></div>)}</div></section>}
-    <section className="system-panel"><h2>系统能力预检</h2><p>{platform}</p><p>当前后端系统 API：{session?.systemApiConfigured ? "已注入运行凭据，实际调用仍需验证" : "尚未配置"}</p><div className="actions"><button disabled={!session || busy} onClick={() => { void authorize(); }}>选择并授权目录</button><button disabled={!session} onClick={() => { void refreshFolders(); }}>刷新授权状态</button></div><p role="status">{fileStatus}</p>{folders.map((folder) => <div className="folder" key={folder}><code>{folder}</code><button onClick={() => { void checkAcl(folder); }}>检查当前用户权限</button></div>)}</section>
+    <div id="png-controls" className="toolbar" tabIndex={-1}><button data-diag-action="note.save" onClick={() => { void save().catch(() => {}); }} disabled={!loaded || busy || exporting}>{busy ? "正在保存…" : "保存便签"}</button><button data-diag-action="png.generate" onClick={() => { void generate(); }} disabled={!loaded || busy || exporting}>{exporting ? "正在生成…" : "生成 PNG"}</button><label>便签主题<select value={theme} onChange={(event) => { clearImages(); setTheme(event.target.value); recorder.action(`theme.${event.target.value}`); }}><option value="paper">暖白纸面</option><option value="night">深色便签</option></select></label><span role="status">{status}{dirty ? " · 有未保存修改" : ""}</span></div>
+    {session ? <div className="workspace"><section id="editor" className="editor" tabIndex={-1}><h2>编辑便签</h2><textarea aria-label="便签正文" value={text} maxLength={50_000} disabled={!loaded || busy || exporting} onChange={(event) => { clearImages(); setText(event.target.value); setDirty(true); }} /></section><section className="preview"><h2>便签预览</h2><Note text={text} theme={theme} /></section></div> : <section className="empty"><p>请通过飞牛桌面入口打开应用。预检版不提供独立密码登录。</p></section>}
+    {pages.length > 0 && <section className="png-result"><h2>导出预览 · {pages.length} 张</h2><p>PNG 已在当前设备生成。选择图片保存，取消保存不会改变便签。</p><div className="png-grid">{pages.map((page, i) => <div key={page.filename}><img src={page.url} alt={`导出预览第 ${i + 1} 张`} /><button data-diag-action="png.download" onClick={() => { void savePng(page).catch((error) => setStatus(message(error))); }}>保存第 {i + 1} 张 PNG</button></div>)}</div></section>}
+    <section id="system" className="system-panel" tabIndex={-1}><h2>系统能力预检</h2><p>{platform}</p><p>当前后端系统 API：{session?.systemApiConfigured ? "已注入运行凭据，实际调用仍需验证" : "尚未配置"}</p><div className="actions"><button data-diag-action="system.authorize" disabled={!session || busy} onClick={() => { void authorize(); }}>选择并授权目录</button><button data-diag-action="system.refresh" disabled={!session} onClick={() => { void refreshFolders(); }}>刷新授权状态</button></div><p role="status">{fileStatus}</p>{folders.map((folder) => <div className="folder" key={folder}><code>{folder}</code><button data-diag-action="system.acl" onClick={() => { void checkAcl(folder); }}>检查当前用户权限</button></div>)}</section>
+    {session && <DiagnosticsPanel key={session.user.uid} />}
     <div className="export-root" ref={exportNode} aria-hidden="true"><Note text={text} theme={theme} /></div>
   </main>;
 }

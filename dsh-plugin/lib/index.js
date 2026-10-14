@@ -17,6 +17,8 @@ export const Config = z.object({
     token: z.string(),
     username: z.string(),
     password: z.string(),
+    nasCookie: z.string(),
+    space: z.string(),
     demoServer: z.string(),
 });
 const EXPORT_THEMES = [

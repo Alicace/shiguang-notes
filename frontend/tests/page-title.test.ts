@@ -36,7 +36,7 @@ test("页面入口统一设置标题，子页面不会覆盖", () => {
 
   assert.match(
     mainSource,
-    /document\.title = getPageTitle\(window\.location\.hostname\)/,
+    /document\.title = isNative \? "拾光便签" : getPageTitle\(window\.location\.hostname\)/,
   );
   assert.doesNotMatch(changelogSource, /document\.title\s*=/);
 });

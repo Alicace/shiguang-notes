@@ -156,6 +156,7 @@ export function CategorySidebar({
           type="search"
           value={searchQuery}
           placeholder="快速搜索关键字"
+          data-diag-action="note.search"
           onChange={(event) => onSearchQueryChange(event.target.value)}
         />
       </label>

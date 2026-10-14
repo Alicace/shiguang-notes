@@ -582,6 +582,23 @@ export class NotesDataStore {
       .sort((left, right) => right.createdAt - left.createdAt);
   }
 
+  async ensureFnosUser(uid: number, username: string): Promise<AuthenticatedAccount> {
+    return this.runExclusive(async () => {
+      const database = await this.readDatabase();
+      const id = `nas-${uid}`;
+      let account = database.users.find((item) => item.id === id);
+      if (!account) {
+        account = { id, username, normalizedUsername: id, createdAt: Date.now(), passwordHash: "fnos-login-only", passwordSalt: "fnos-login-only", passwordVersion: 1, skillTokenVersion: 1 };
+        database.users.push(account);
+        await this.writeDatabase(database);
+      } else if (account.username !== username) {
+        account.username = username;
+        await this.writeDatabase(database);
+      }
+      return { id, username, createdAt: account.createdAt, passwordVersion: account.passwordVersion, skillTokenVersion: account.skillTokenVersion };
+    });
+  }
+
   async createUser(username: string): Promise<CreatedAccount> {
     return this.runExclusive(async () => {
       const displayUsername = validateUsername(username);
@@ -633,6 +650,7 @@ export class NotesDataStore {
 
     if (
       !account ||
+      account.id.startsWith("nas-") ||
       !(await verifyPassword(
         password,
         account.passwordSalt,

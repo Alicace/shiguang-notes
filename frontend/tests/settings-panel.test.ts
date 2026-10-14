@@ -419,7 +419,7 @@ test("Hermes Skill 支持下载、复制完整安装指令和主动重置安装�
   assert.ok(existsSync("public/hermes-skill-icon.png"));
   assert.match(
     settingsSource,
-    /className="settings-tool-icon"[\s\S]*src="\/hermes-skill-icon\.png"[\s\S]*alt=""/s,
+    /className="settings-tool-icon"[\s\S]*src=\{appPath\("\/hermes-skill-icon\.png"\)\}[\s\S]*alt=""/s,
   );
   assert.doesNotMatch(
     settingsSource,

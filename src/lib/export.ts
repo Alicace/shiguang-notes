@@ -1,3 +1,4 @@
+import { appFetch as fetch, isNative } from "./fnos-client.js";
 import { EXPORT_RETRY_BASE_DELAY_MS, EXPORT_RETRY_LIMIT, EXPORT_REQUEST_TIMEOUT_MS } from "./export-config.js";
 import type {
   NoteCardThemeId,
@@ -254,6 +255,11 @@ export async function exportMarkdownAsPng(
   theme: NoteCardThemeId,
   footer: ExportFooterOptions,
 ): Promise<void> {
+  if (isNative) {
+    const { exportNativePng } = await import("../native/png.js");
+    await exportNativePng(markdown, theme, footer);
+    return;
+  }
   const filename = buildExportFilename();
   const blob = await tryServerExport(markdown, filename, theme, footer);
   await saveBlob(blob, filename);

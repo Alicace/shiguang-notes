@@ -1,3 +1,4 @@
+import { appPath } from "../lib/fnos-client.js";
 import {
   useCallback,
   useEffect,
@@ -34,6 +35,7 @@ import {
 } from "../lib/markdown-shortcuts";
 
 interface EditorPanelProps {
+  readOnly?: boolean;
   markdown: string;
   onMarkdownChange: (markdown: string) => void;
   onImageImportingChange: (isImporting: boolean) => void;
@@ -147,6 +149,7 @@ function collectVisualLineOffsets(
 export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(function EditorPanel(
   {
     markdown,
+    readOnly = false,
     onMarkdownChange,
     onImageImportingChange,
   },
@@ -1288,6 +1291,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(funct
           {editorContent.map((block, blockIndex) =>
             block.kind === "text" ? (
               <textarea
+                readOnly={readOnly}
                 id={blockIndex === 0 ? "markdown-editor" : undefined}
                 key={`text-${blockIndex}`}
                 name={`note-content-${blockIndex}`}
@@ -1404,55 +1408,60 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(funct
                       <button
                         type="button"
                         aria-label="删除这张图片"
+                        data-diag-action="image.remove"
                         onClick={() =>
                           requestImageDeletion(block, block.markerEnd)
                         }
                       >
                         <img
-                          src="/smartisan/mobile/item_image_btn_unbrella_delete.png"
+                          src={appPath("/smartisan/mobile/item_image_btn_unbrella_delete.png")}
                           alt=""
                         />
                       </button>
                       <button
                         type="button"
                         aria-label="编辑图片标注"
+                        data-diag-action="image.caption"
                         onClick={() => openImageCaption(block)}
                       >
                         <img
-                          src="/smartisan/mobile/item_image_btn_unbrella_edit_detail.png"
+                          src={appPath("/smartisan/mobile/item_image_btn_unbrella_edit_detail.png")}
                           alt=""
                         />
                       </button>
                       <button
                         type="button"
                         aria-label="下载这张图片"
+                        data-diag-action="image.download"
                         onClick={() => void downloadEditorImage(block)}
                       >
                         <img
-                          src="/smartisan/mobile/item_image_btn_unbrella_download_image.png"
+                          src={appPath("/smartisan/mobile/item_image_btn_unbrella_download_image.png")}
                           alt=""
                         />
                       </button>
                       <button
                         type="button"
                         aria-label="放大查看这张图片"
+                        data-diag-action="image.preview"
                         onClick={() => {
                           setActiveImageKey(null);
                           setPreviewImage({ alt: block.alt, source: block.source });
                         }}
                       >
                         <img
-                          src="/smartisan/mobile/item_image_btn_unbrella_preview_image.png"
+                          src={appPath("/smartisan/mobile/item_image_btn_unbrella_preview_image.png")}
                           alt=""
                         />
                       </button>
                       <button
                         type="button"
                         aria-label="裁剪这张图片"
+                        data-diag-action="image.crop"
                         onClick={() => void openImageCrop(block)}
                       >
                         <img
-                          src="/smartisan/mobile/item_image_btn_unbrella_edit_image.png"
+                          src={appPath("/smartisan/mobile/item_image_btn_unbrella_edit_image.png")}
                           alt=""
                         />
                       </button>
@@ -1489,12 +1498,13 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(funct
                   type="button"
                   className="editor-image-handle"
                   aria-label="拖动图片位置"
+                  data-diag-action="image.move"
                   onPointerDown={(event) => {
                     beginImageDrag(event, block);
                   }}
                 >
                   <img
-                    src="/smartisan/mobile/detail_note_item_image_move.png"
+                    src={appPath("/smartisan/mobile/detail_note_item_image_move.png")}
                     alt=""
                     draggable={false}
                   />

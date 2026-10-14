@@ -2,9 +2,9 @@ async (page) => {
   const directory = "output/playwright";
   const editor = page.getByRole("textbox", { name: "便签正文", exact: true });
   await editor.waitFor();
-  const sample = "# 拾光便签导出验证\n\n中文与 English 都应该清晰可读。\n\n- 便签在 NAS 保存\n- PNG 在客户端生成\n\n> 导出文件必须有真实内容，不能只有正确的格式与尺寸。";
+  const sample = "# 拾光便签导出验证\n\n中文与 English，**粗体**和 `代码` 都应该清晰可读。\n\n- 便签在 NAS 保存\n- PNG 在客户端生成\n\n> 导出文件必须有真实内容，不能只有正确的格式与尺寸。\n\n| 项目 | 结果 |\n| --- | --- |\n| 表格 | 可读 |";
   async function generate(theme, filename) {
-    await page.getByRole("combobox").selectOption(theme);
+    await page.locator(".toolbar select").selectOption(theme);
     await page.getByRole("button", { name: "生成 PNG", exact: true }).click();
     const images = page.getByRole("img", { name: /^导出预览第/ });
     await images.first().waitFor();
@@ -31,6 +31,9 @@ async (page) => {
     return sizes.length;
   }
   await editor.fill(sample);
+  for (const selector of ["h1", "strong", "code", "li", "blockquote", "table"]) {
+    if (await page.locator(`.preview .note-content ${selector}`).count() === 0) throw new Error(`Markdown ${selector} 未渲染。`);
+  }
   await page.setViewportSize({ width: 1366, height: 900 });
   await generate("paper", "shiguang-paper.png");
   await generate("night", "shiguang-night.png");
@@ -38,6 +41,10 @@ async (page) => {
   await editor.fill(longNote);
   const count = await generate("paper", "shiguang-long-first.png");
   if (count < 2) throw new Error("长便签未分段。");
+  await editor.fill("# 超限验证\n\n" + "长段落必须拒绝建立超大画布。\n\n".repeat(500));
+  await page.getByRole("button", { name: "生成 PNG", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "超过 12 张" }).waitFor();
+  if (await page.getByRole("img", { name: /^导出预览第/ }).count()) throw new Error("超限后仍残留图片。");
   await page.setViewportSize({ width: 390, height: 844 });
   await editor.fill(sample);
   await generate("paper", "shiguang-mobile.png");

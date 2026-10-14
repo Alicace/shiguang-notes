@@ -1,4 +1,5 @@
 import type { NoteWorkspace } from "../types/app.js";
+import { appFetch as fetch, isNative } from "./fnos-client.js";
 
 export type AuthRole = "user" | "superadmin";
 
@@ -208,8 +209,10 @@ export function getCloudWorkspace(): Promise<CloudWorkspace> {
     "/api/workspace",
     undefined,
     "读取云端便签失败。",
-  );
+  ).then((stored) => { nativeRevision = stored.updatedAt; return stored; });
 }
+
+let nativeRevision: number | null = null;
 
 export function saveCloudWorkspace(
   workspace: NoteWorkspace,
@@ -221,10 +224,10 @@ export function saveCloudWorkspace(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ workspace }),
+      body: JSON.stringify({ workspace, ...(isNative ? { expectedUpdatedAt: nativeRevision } : {}) }),
     },
     "保存云端便签失败。",
-  );
+  ).then((stored) => { nativeRevision = stored.updatedAt; return stored; });
 }
 
 export async function listManagedUsers(): Promise<AccountSummary[]> {

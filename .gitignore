@@ -11,6 +11,13 @@ storage/data/*
 fnos/m0/.dev-data/
 fnnotes-m0/app/web/
 fnnotes-m0/app/server/
+fnnotes-m0/app/dist/
+fnnotes-m0/app/dist-server/
+fnnotes-m0/app/node_modules/
+fnnotes-m0/app/public/
+fnnotes-m0/app/src/
+fnnotes-m0/app/skills/
+fnnotes-m0/app/package.json
 fnnotes-m0/app/build-info.json
 fnnotes-m0/app/LICENSE
 fnnotes-m0/app/NOTICE

@@ -177,7 +177,7 @@ async function resolveConfig(options) {
     getConfigValue("NOTES_API_PASSWORD"),
   );
 
-  if (!token && (!username || !password)) {
+  if (!token && !getConfigValue("NOTES_NAS_COOKIE") && (!username || !password)) {
     throw new Error(
       "缺少认证信息。请设置 NOTES_API_TOKEN，或在 .env 中提供 NOTES_API_USERNAME/NOTES_API_PASSWORD 以自动生成 Token。",
     );
@@ -185,6 +185,8 @@ async function resolveConfig(options) {
 
   return {
     baseUrl,
+    nasCookie: getConfigValue("NOTES_NAS_COOKIE"),
+    space: getConfigValue("NOTES_SPACE"),
     envFilePath:
       explicitEnvPath ?? (Object.keys(skillEnv).length > 0 ? skillEnvPath : null),
     password,
@@ -207,12 +209,24 @@ async function readResponsePayload(response) {
   }
 }
 
+async function nativeHeaders(config) {
+  if (!/\/app\/[^/]+$/.test(config.baseUrl)) return {};
+  if (!config.nasCookie) throw new Error("飞牛网关需要有效 NAS 登录态，请配置 NOTES_NAS_COOKIE；应用 Token 不能代替 NAS 登录。");
+  const response = await fetch(`${config.baseUrl}/api/auth/session`, { redirect: "error", headers: { Cookie: config.nasCookie } });
+  if (!response.ok) throw new Error("NAS 登录态失效，请重新登录并更新客户端配置。");
+  const session = await response.json();
+  return { Cookie: config.nasCookie, Origin: new URL(config.baseUrl).origin, "X-Fnnotes-CSRF": session.csrfToken, "X-Shiguang-User": session.user.id, ...(config.space ? { "X-Shiguang-Space": config.space } : {}) };
+}
+
 async function requestSkillToken(config) {
+  const gatewayHeaders = await nativeHeaders(config);
   const response = await fetch(`${config.baseUrl}/api/auth/skill-token`, {
+    ...(config.nasCookie ? { redirect: "error" } : {}),
     method: "POST",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
+      ...gatewayHeaders,
     },
     body: JSON.stringify({
       password: config.password,
@@ -315,11 +329,14 @@ async function resolveSkillToken(config) {
 }
 
 async function apiJson(config, token, pathname, init = {}) {
+  const gatewayHeaders = await nativeHeaders(config);
   const response = await fetch(`${config.baseUrl}${pathname}`, {
     ...init,
+    ...(config.nasCookie ? { redirect: "error" } : {}),
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${token}`,
+      ...gatewayHeaders,
       ...(init.body ? { "Content-Type": "application/json" } : {}),
       ...init.headers,
     },

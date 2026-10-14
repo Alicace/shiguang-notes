@@ -56,6 +56,8 @@ export function resolveServiceConfig(explicit) {
     }
     return {
         baseUrl,
+        ...((explicit?.nasCookie || readEnv("NOTES_NAS_COOKIE")) ? { nasCookie: explicit?.nasCookie || readEnv("NOTES_NAS_COOKIE") } : {}),
+        ...((explicit?.space || readEnv("NOTES_SPACE")) ? { space: explicit?.space || readEnv("NOTES_SPACE") } : {}),
         token: explicit?.token ?? readEnv("NOTES_API_TOKEN"),
         username: explicit?.username ?? readEnv("NOTES_API_USERNAME"),
         password: explicit?.password ?? readEnv("NOTES_API_PASSWORD"),
@@ -142,12 +144,15 @@ export class NotesClient {
         }
     }
     async apiJson(token, pathname, init = {}, signal) {
+        const nativeHeaders = await this.nativeHeaders(signal);
         const response = await this.fetchImpl(`${this.baseUrl}${pathname}`, {
+            ...(this.config.nasCookie ? { redirect: "error" } : {}),
             ...init,
             signal,
             headers: {
                 Accept: "application/json",
                 Authorization: `Bearer ${token}`,
+                ...nativeHeaders,
                 ...(init.body ? { "Content-Type": "application/json" } : {}),
                 ...init.headers,
             },
@@ -163,12 +168,15 @@ export class NotesClient {
     }
     /** 用用户名/密码向 /api/auth/skill-token 申请稳定 Token（仅内存，不落盘）。 */
     async requestSkillToken(signal) {
+        const nativeHeaders = await this.nativeHeaders(signal);
         const response = await this.fetchImpl(`${this.baseUrl}/api/auth/skill-token`, {
+            ...(this.config.nasCookie ? { redirect: "error" } : {}),
             method: "POST",
             signal,
             headers: {
                 Accept: "application/json",
                 "Content-Type": "application/json",
+                ...nativeHeaders,
             },
             body: JSON.stringify({
                 password: this.config.password,
@@ -189,12 +197,23 @@ export class NotesClient {
         }
         return payload.token;
     }
+    async nativeHeaders(signal) {
+        if (!/\/app\/[^/]+$/.test(this.baseUrl))
+            return {};
+        if (!this.config.nasCookie)
+            throw new NotesApiError("飞牛网关需要有效 NAS 登录态，请配置 nasCookie；应用 Token 不能代替 NAS 登录。");
+        const response = await this.fetchImpl(`${this.baseUrl}/api/auth/session`, { signal, redirect: "error", headers: { Cookie: this.config.nasCookie } });
+        if (!response.ok)
+            throw new NotesApiError("NAS 登录态失效，请在 NAS 重新登录并更新客户端配置。", response.status);
+        const session = await response.json();
+        return { Cookie: this.config.nasCookie, Origin: new URL(this.baseUrl).origin, "X-Fnnotes-CSRF": session.csrfToken, "X-Shiguang-User": session.user.id, ...(this.config.space ? { "X-Shiguang-Space": this.config.space } : {}) };
+    }
     /** 解析可用 Token：显式 Token 优先，否则用账号密码申请并缓存。 */
     resolveToken(signal) {
         if (this.config.token) {
             return Promise.resolve(this.config.token);
         }
-        if (!this.config.username || !this.config.password) {
+        if (!this.config.nasCookie && (!this.config.username || !this.config.password)) {
             return Promise.reject(new NotesApiError("缺少认证信息。请设置 NOTES_API_TOKEN，或提供 NOTES_API_USERNAME/" +
                 "NOTES_API_PASSWORD 以自动申请 Token。"));
         }

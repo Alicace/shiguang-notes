@@ -8,13 +8,15 @@ import { SuperAdminPage } from "./components/SuperAdminPage";
 import { installAutoHideScrollbars } from "./lib/auto-hide-scrollbars";
 import { getPageTitle } from "./lib/page-title";
 import "./styles.css";
+import { isNative, nativeBase } from "./lib/fnos-client";
+import "./native/styles.css";
 
-document.title = getPageTitle(window.location.hostname);
+document.title = isNative ? "拾光便签" : getPageTitle(window.location.hostname);
 installAutoHideScrollbars();
 
-const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+const pathname = (isNative ? window.location.pathname.slice(nativeBase.length) : window.location.pathname).replace(/\/+$/, "") || "/";
 const rootPage =
-  pathname === "/superadmin" ? (
+  pathname === "/superadmin" && !isNative ? (
     <SuperAdminPage />
   ) : pathname === "/changelog" ? (
     <ChangelogPage markdown={changelogMarkdown} />

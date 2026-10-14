@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { createDeflate, deflateRawSync, inflateSync } from "node:zlib";
 import multer, { MulterError } from "multer";
-import { chromium, type Browser, type Locator, type Page } from "playwright";
+import type { Browser, Locator, Page } from "playwright";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import sharp, { type Metadata } from "sharp";
@@ -29,6 +29,7 @@ import {
 } from "../src/lib/note-card-theme-styles.js";
 import {
   getNoteTitle,
+  createNoteDocument,
   orderNoteDocuments,
   parseNoteWorkspace,
 } from "../src/lib/notes.js";
@@ -85,6 +86,7 @@ import {
   type WechatOfficialConfiguration,
   type WechatPermanentImage,
 } from "./wechat-official.js";
+import { installNativeGateway, installNativeRoutes, nativeContext, nativeMode, nativePrefix, NativeSpaces } from "./fnos.js";
 
 interface ExportRequestBody {
   markdown?: string;
@@ -205,6 +207,8 @@ type WorkspaceArchiveJobStatus =
   | "failed";
 
 interface WorkspaceArchiveJob {
+  nativeOwner?: string;
+  nativeScope?: string;
   id: string;
   status: WorkspaceArchiveJobStatus;
   progress: number;
@@ -230,7 +234,7 @@ const rootDir =
   path.basename(__dirname) === "server" && path.basename(path.dirname(__dirname)) === "dist-server"
     ? path.resolve(__dirname, "..", "..")
     : path.resolve(__dirname, "..");
-const distDir = path.join(rootDir, "dist");
+const distDir = process.env.FNOS_WEB_DIR || path.join(rootDir, "dist");
 const publicDir = path.join(rootDir, "public");
 const workspaceSkillDir = path.join(rootDir, "skills", "notes-workspace-api");
 const imagesDir = process.env.IMAGE_STORAGE_DIR || path.join(rootDir, "storage", "images");
@@ -291,6 +295,7 @@ const activeAiUsers = new Set<string>();
 const aiRequestHistory = new Map<string, number[]>();
 const workspaceArchiveJobs = new Map<string, WorkspaceArchiveJob>();
 const notesDataStore = new NotesDataStore(dataDirectory);
+const nativeSpaces = new NativeSpaces(path.join(dataDirectory, "shared-spaces.json"));
 const execFileAsync = promisify(execFile);
 const defaultWechatFooterHammerUrl =
   "https://notes.fangyuanxiaozhan.com/images/b5d3bd9587fa9a1226b25a0709ff61a450df29d96ca2f127c6afc0b8e193a60e.png";
@@ -367,7 +372,7 @@ function getRenderUrl(
 function getPublicBaseUrl(request: Request): string {
   const protocol = request.get("x-forwarded-proto") || request.protocol || "http";
   const host = request.get("x-forwarded-host") || request.get("host");
-  return `${protocol}://${host}`;
+  return `${protocol}://${host}${nativeMode ? nativePrefix : ""}`;
 }
 
 function getNotesPublicBaseUrl(request: Request): string {
@@ -379,7 +384,7 @@ function getNotesPublicBaseUrl(request: Request): string {
   }
 
   url.hash = "";
-  url.pathname = "";
+  url.pathname = nativeMode ? nativePrefix : "";
   url.search = "";
   return url.toString().replace(/\/$/, "");
 }
@@ -404,6 +409,7 @@ async function buildHermesSkillPackage(
   const env = [
     `NOTES_API_BASE_URL=${getNotesPublicBaseUrl(request)}`,
     `NOTES_API_TOKEN=${token}`,
+    ...(nativeMode ? ["# 飞牛网关仍需有效 NAS 登录态；在本机填写 Cookie，不要公开分享。", "NOTES_NAS_COOKIE=", `NOTES_SPACE=${nativeContext.getStore()?.scope.startsWith("space-") ? nativeContext.getStore()?.scope : ""}`] : []),
     "",
   ].join("\n");
 
@@ -486,6 +492,7 @@ function getSuperAdminCredentials(): {
 async function getAuthenticatedUser(
   request: Request,
 ): Promise<AuthSession | null> {
+  if (nativeMode) return nativeContext.getStore()?.user || null;
   const session = verifySessionToken(readSessionToken(request.get("cookie")));
 
   if (!session) {
@@ -786,6 +793,8 @@ function normalizeRenderableImageUrls(
 }
 
 async function getBrowser(): Promise<Browser> {
+  if (nativeMode) throw new Error("原生应用使用客户端 PNG 导出。");
+  const { chromium } = await import("playwright");
   if (!browserPromise) {
     browserPromise = chromium.launch({ headless: true });
   }
@@ -817,6 +826,7 @@ async function resolveMarkdown(body: ExportRequestBody | ArchiveRequestBody): Pr
   if (typeof body.markdown === "string") {
     return body.markdown;
   }
+  if (nativeMode) throw new Error("原生应用只接受客户端提交的 Markdown，不允许读取服务端任意路径。");
 
   if (typeof body.markdownPath === "string" && body.markdownPath.trim()) {
     return fs.readFile(body.markdownPath, "utf8");
@@ -967,6 +977,16 @@ async function readRootRelativeArchiveImage(source: string): Promise<ImageSource
     return null;
   }
 
+  if (nativeMode) {
+    if (pathname.startsWith(nativePrefix + "/")) pathname = pathname.slice(nativePrefix.length);
+    if (pathname.startsWith("/images/")) {
+      const match = pathname.match(/^\/images\/(nas-\d+|space-[a-f0-9-]{36})\/([a-f0-9]{64}\.[a-z0-9]+)$/);
+      const user = nativeContext.getStore()?.user;
+      if (!match || !user || !(await nativeSpaces.access(user.id, match[1]))) throw new Error("无权读取该图片。");
+      return { buffer: await fs.readFile(path.join(imagesDir, match[1], match[2])), filename: match[2] };
+    }
+  }
+
   if (pathname.startsWith("/images/")) {
     const filename = path.basename(pathname);
     const filePath = path.join(imagesDir, filename);
@@ -990,6 +1010,7 @@ async function readRootRelativeArchiveImage(source: string): Promise<ImageSource
 }
 
 async function readRelativeArchiveImage(source: string): Promise<ImageSource | null> {
+  if (nativeMode) return null;
   const [pathname] = source.split(/[?#]/, 1);
   const filePath = path.resolve(rootDir, pathname);
 
@@ -1021,7 +1042,7 @@ async function resolveArchiveImage(
 
         if (
           sourceUrl.host.toLowerCase() === publicUrl.host.toLowerCase() &&
-          sourceUrl.pathname.startsWith("/images/")
+          (sourceUrl.pathname.startsWith("/images/") || (nativeMode && sourceUrl.pathname.startsWith(nativePrefix + "/images/")))
         ) {
           return readRootRelativeArchiveImage(
             `${sourceUrl.pathname}${sourceUrl.search}`,
@@ -1067,7 +1088,7 @@ function buildArchiveFontFaceCss(fonts: ArchiveFont[]): string {
     .map(
       (font) => `      @font-face {
         font-family: "OPPOSansArchive";
-        src: url("./html.assets/fonts/${font.outputName}") format("woff2");
+        src: url("./html.assets/fonts/${font.outputName}") format("${font.outputName.endsWith(".ttf") ? "truetype" : "woff2"}");
         font-weight: ${font.weight};
         font-style: normal;
         font-display: swap;
@@ -2719,6 +2740,11 @@ async function buildArchiveFontEntries(
   markdown: string,
   footer: FooterConfig,
 ): Promise<{ entries: ZipEntry[]; fonts: ArchiveFont[] }> {
+  if (nativeMode) {
+    const fonts = archiveFonts.map((font) => ({ ...font, outputName: font.sourceName }));
+    const entries = await Promise.all(fonts.map(async (font) => ({ path: `${folderName}/${htmlAssetFolderName}/fonts/${font.outputName}`, data: await fs.readFile(path.join(rootDir, "src/assets/fonts", font.sourceName)) })));
+    return { entries, fonts };
+  }
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "notes-font-subset-"));
   const textFilePath = path.join(tempDir, "subset-text.txt");
   const entries: ZipEntry[] = [];
@@ -3350,7 +3376,10 @@ async function persistImage(
 
   const hash = createHash("sha256").update(source.buffer).digest("hex");
   const filename = `${hash}.${extension}`;
-  const filePath = path.join(imagesDir, filename);
+  const scope = nativeMode ? nativeContext.getStore()!.scope : "";
+  const destination = path.join(imagesDir, scope);
+  await fs.mkdir(destination, { recursive: true, mode: 0o700 });
+  const filePath = path.join(destination, filename);
 
   try {
     await fs.access(filePath);
@@ -3358,12 +3387,12 @@ async function persistImage(
     await fs.writeFile(filePath, source.buffer);
   }
 
-  const publicPath = `/images/${filename}`;
+  const publicPath = `/images/${scope ? scope + "/" : ""}${filename}`;
 
   return {
     hash,
     extension,
-    path: publicPath,
+    path: nativeMode ? nativePrefix + publicPath : publicPath,
     url: `${getPublicBaseUrl(request)}${publicPath}`,
   };
 }
@@ -4065,6 +4094,7 @@ function assertWechatDraftContentLimits(html: string): void {
 
 const app = express();
 app.set("trust proxy", 1);
+if (nativeMode) installNativeGateway(app, notesDataStore, nativeSpaces);
 
 function isPublicApiRequestWhenLoginRequired(request: Request): boolean {
   if (request.method === "GET") {
@@ -4092,7 +4122,7 @@ function isPublicApiRequestWhenLoginRequired(request: Request): boolean {
 }
 
 app.use((request: Request, response: Response, next: NextFunction) => {
-  applyCorsHeaders(request, response);
+  if (!nativeMode) applyCorsHeaders(request, response);
 
   if (request.method === "OPTIONS") {
     response.sendStatus(204);
@@ -4165,7 +4195,13 @@ app.use(
   },
 );
 app.use(express.json({ limit: "10mb" }));
-app.use("/images", express.static(imagesDir, { fallthrough: false, immutable: true, maxAge: "1y" }));
+if (nativeMode) {
+  installNativeRoutes(app, nativeSpaces, notesDataStore);
+  app.use("/images/:scope", async (request: Request, response: Response, next: NextFunction) => {
+    if (!(await nativeSpaces.access(nativeContext.getStore()!.user.id, String(request.params.scope)))) { response.sendStatus(403); return; }
+    express.static(path.join(imagesDir, String(request.params.scope)), { fallthrough: false })(request, response, next);
+  });
+} else app.use("/images", express.static(imagesDir, { fallthrough: false, immutable: true, maxAge: "1y" }));
 
 app.get("/api/auth/session", async (request: Request, response: Response) => {
   const user = await getAuthenticatedUser(request);
@@ -4706,7 +4742,18 @@ app.get("/api/workspace", async (request: Request, response: Response) => {
     return;
   }
 
-  const stored = await notesDataStore.getWorkspace(user.id);
+  const scope = nativeMode ? nativeContext.getStore()!.scope : user.id;
+  let stored = await notesDataStore.getWorkspace(scope);
+  if (nativeMode && !stored && scope === user.id) {
+    try {
+      const old = JSON.parse(await fs.readFile(path.join(process.env.TRIM_PKGVAR!, "notes", `${nativeContext.getStore()!.uid}.json`), "utf8"));
+      if (typeof old.text !== "string") throw new Error("旧版正文格式不正确。");
+      const note = createNoteDocument(old.text);
+      try { stored = await notesDataStore.saveWorkspace(user.id, { version: 1, notes: [note], folders: [], activeNoteId: note.id }, Date.now(), null); }
+      catch (error) { if (!(error instanceof WorkspaceConflictError)) throw error; stored = await notesDataStore.getWorkspace(user.id); }
+    } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  }
+  if (nativeMode) { response.setHeader("X-Shiguang-Writable", String(nativeContext.getStore()!.writable)); response.setHeader("X-Shiguang-User", user.id); }
   response.json(
     stored ?? {
       updatedAt: null,
@@ -4839,7 +4886,7 @@ app.put(
     try {
       response.json(
         await notesDataStore.saveWorkspace(
-          user.id,
+          nativeMode ? nativeContext.getStore()!.scope : user.id,
           request.body?.workspace,
           Date.now(),
           expectedUpdatedAt,
@@ -4947,6 +4994,7 @@ app.post(
     }
 
     const job: WorkspaceArchiveJob = {
+      ...(nativeMode ? { nativeOwner: nativeContext.getStore()!.user.id, nativeScope: nativeContext.getStore()!.scope } : {}),
       id: randomUUID(),
       status: "preparing",
       progress: 1,
@@ -4972,7 +5020,7 @@ app.get(
 
     response.setHeader("Cache-Control", "no-store");
 
-    if (!job) {
+    if (!job || (nativeMode && (job.nativeOwner !== nativeContext.getStore()!.user.id || job.nativeScope !== nativeContext.getStore()!.scope))) {
       response.status(404).json({ error: "整体导出任务不存在或已过期。" });
       return;
     }
@@ -4989,7 +5037,7 @@ app.get(
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("X-Content-Type-Options", "nosniff");
 
-    if (!job) {
+    if (!job || (nativeMode && (job.nativeOwner !== nativeContext.getStore()!.user.id || job.nativeScope !== nativeContext.getStore()!.scope))) {
       response.status(404).json({ error: "整体导出任务不存在或已过期。" });
       return;
     }
@@ -5277,8 +5325,12 @@ if (await hasDistIndex()) {
 
 await checkAiAvailability();
 
-const server = app.listen(port, () => {
-  console.log(`Backend listening on http://127.0.0.1:${port}`);
+const server = app.listen(nativeMode ? process.env.FNOS_SOCKET! : port, async () => {
+  if (nativeMode) {
+    await fs.chmod(process.env.FNOS_SOCKET!, 0o660);
+    await fs.writeFile(path.join(process.env.TRIM_PKGVAR!, "ready.pid"), String(process.pid), { mode: 0o600 });
+    console.log("拾光便签完整应用已启动，使用飞牛统一网关。");
+  } else console.log(`Backend listening on http://127.0.0.1:${port}`);
 });
 
 async function closeBrowser(): Promise<void> {
@@ -5294,6 +5346,7 @@ async function closeBrowser(): Promise<void> {
 async function shutdown(exitCode: number): Promise<void> {
   server.close(async () => {
     await closeBrowser();
+    if (nativeMode) { await fs.rm(process.env.FNOS_SOCKET!, { force: true }); await fs.rm(path.join(process.env.TRIM_PKGVAR!, "ready.pid"), { force: true }); }
     process.exit(exitCode);
   });
 }

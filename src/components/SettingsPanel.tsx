@@ -15,8 +15,11 @@ import {
 } from "../lib/wechat-config.js";
 import type { WorkspaceArchiveProgress } from "../lib/export.js";
 import type { ThemePreferenceId } from "../types/app.js";
+import { isNative, appPath } from "../lib/fnos-client.js";
+import { NativeSettings } from "../native/NativeSettings.js";
 
 interface SettingsPanelProps {
+  onNativeSpaceChange?: (scope: string) => Promise<void>;
   aiAvailable?: boolean;
   aiEnabled?: boolean;
   authUsername?: string | null;
@@ -58,14 +61,16 @@ const SETTINGS_CATEGORIES = [
   { id: "account", label: "账号与同步" },
   { id: "extensions", label: "工具与扩展" },
   { id: "about", label: "关于" },
+  { id: "fnos", label: "飞牛与诊断" },
 ] as const;
 
 type SettingsCategory = (typeof SETTINGS_CATEGORIES)[number]["id"];
 
 const PROJECT_REPOSITORY_URL = "https://github.com/zhaoolee/notes";
-const CHANGELOG_URL = "/changelog";
+const CHANGELOG_URL = appPath("/changelog");
 
 export function SettingsPanel({
+  onNativeSpaceChange = async () => {},
   aiAvailable = false,
   aiEnabled = false,
   authUsername = null,
@@ -266,6 +271,7 @@ export function SettingsPanel({
           <button
             type="button"
             className="settings-close"
+            data-diag-action="settings.close"
             aria-label="关闭设置"
             onClick={onClose}
           >
@@ -275,7 +281,7 @@ export function SettingsPanel({
 
         <div className="settings-layout">
           <nav className="settings-category-nav" aria-label="设置分类">
-            {SETTINGS_CATEGORIES.map((item) => {
+            {SETTINGS_CATEGORIES.filter((item) => item.id !== "fnos" || isNative).map((item) => {
               const isActive = category === item.id;
 
               return (
@@ -285,6 +291,7 @@ export function SettingsPanel({
                   className={isActive ? "active" : undefined}
                   aria-current={isActive ? "page" : undefined}
                   aria-controls={`settings-pane-${item.id}`}
+                  data-diag-action="settings.category"
                   onClick={() => setCategory(item.id)}
                 >
                   {item.label}
@@ -294,6 +301,8 @@ export function SettingsPanel({
           </nav>
 
           <div className="settings-content">
+            {isNative && category === "extensions" && <p>飞牛网关会先校验 NAS 登录态。外部 Skill/DSH 需配置有效的 NAS 登录态及自己的应用 Token；应用 Token 不能代替 NAS 登录。PNG 由客户端生成，NAS 上不运行截图服务。</p>}
+            {isNative && <section id="settings-pane-fnos" className="settings-pane" hidden={category !== "fnos"}><NativeSettings onSpaceChange={onNativeSpaceChange} /></section>}
             <section
               id="settings-pane-general"
               className="settings-pane"
@@ -521,7 +530,7 @@ export function SettingsPanel({
                       className="settings-row settings-logout-row"
                       onClick={onLogout}
                     >
-                      <span className="settings-row-label">退出登录</span>
+                      <span className="settings-row-label">{isNative ? "返回 NAS 管理登录态" : "退出登录"}</span>
                       <span className="settings-row-value">
                         <span className="settings-row-chevron" aria-hidden="true">›</span>
                       </span>
@@ -767,7 +776,7 @@ export function SettingsPanel({
                 <article className="settings-tool-card">
                   <img
                     className="settings-tool-icon"
-                    src="/hermes-skill-icon.png"
+                    src={appPath("/hermes-skill-icon.png")}
                     alt=""
                     aria-hidden="true"
                   />

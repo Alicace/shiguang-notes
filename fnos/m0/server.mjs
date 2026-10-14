@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
+import metadata from "./metadata.json" with { type: "json" };
 
 export const PREFIX = "/app/fnnotes-m0";
 export const APP_NAME = "fnnotes-m0";
@@ -130,6 +131,7 @@ export function createM0Server({ dataDir, webDir, prefix = PREFIX, systemGateway
       if (pathname !== prefix && !pathname.startsWith(prefix + "/")) throw new RequestError(404, "页面不存在。");
       const route = pathname.slice(prefix.length) || "/";
       if (req.method === "GET" && route === "/api/session") return json(res, 200, { user, csrfToken: tokenFor(user.uid), prototype: true, simulation, systemApiConfigured: Boolean(process.env.TRIM_API_TOKEN) });
+      if (req.method === "GET" && route === "/api/program-info") return json(res, 200, { appVersion: metadata.appVersion, stage: metadata.stage, nodeVersion: process.versions.node, simulation, systemApiConfigured: Boolean(process.env.TRIM_API_TOKEN) });
       if (req.method === "GET" && route === "/api/workspace") return json(res, 200, await load(user.uid));
       if (req.method === "PUT" && route === "/api/workspace") {
         checkWrite(req, user);

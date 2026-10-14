@@ -43,5 +43,15 @@ textarea { width: 100%; min-height: 540px; resize: vertical; border: 1px solid #
 .png-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
 .png-grid img { display: block; width: 100%; max-height: 420px; object-fit: contain; margin-bottom: 12px; }
 .empty { padding: 40px 0; }
+.diagnostics-panel { background: #fff; border: 1px solid #e1dad2; border-radius: 14px; padding: 20px; margin-top: 22px; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+.diagnostics-panel summary { cursor: pointer; min-height: 44px; font-weight: 600; }
+.diagnostics-panel h2 { margin-top: 22px; }
+.capture-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.capture-toggle input { width: 20px; height: 20px; }
+.test-case, .feature-list article { border-top: 1px solid #e1dad2; padding: 18px 0; }
+.diagnostics-panel h3 { font-size: 15px; margin: 0 0 10px; }
+.test-case label { display: flex; align-items: center; gap: 8px; }
+.device-label, .feature-list h3 span { display: inline-block; font-size: 12px; font-weight: 400; background: #f6f1e9; border-radius: 4px; padding: 2px 6px; margin-left: 8px; }
+.feature-inventory { margin-top: 22px; }
 @media (max-width: 900px) { main { padding: 18px; } .workspace { grid-template-columns: 1fr; } textarea { min-height: 300px; } }
 @media (max-width: 480px) { main { padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); } .identity { max-width: 45%; } .editor, .preview, .system-panel, .png-result { padding: 14px; } .preview .note-card { padding: 22px; font-size: 16px; } .toolbar [role=status] { width: 100%; } }

@@ -1162,7 +1162,7 @@ test("移动端复用安卓版 48dp 顶栏素材且返回按钮不会被标题�
     appSource,
     /className="mobile-notes-back"[\s\S]*className="mobile-back-icon"/,
   );
-  assert.match(appSource, /src="\/smartisan\/mobile\/btn_settings\.png"/);
+  assert.match(appSource, /src=\{appPath\("\/smartisan\/mobile\/btn_settings\.png"\)\}/);
   assert.match(
     appSource,
     /className="mobile-list-create"[\s\S]*className="smartisan-toolbar-icon icon-create"/,
@@ -1236,7 +1236,7 @@ test("移动端保留安卓版纸片、固定装订夹与木纹资源", () => {
   assert.match(sidebarSource, /className="note-list-clip-rail"/);
   assert.match(
     sidebarSource,
-    /src="\/smartisan\/mobile\/note_item_clip_normal\.png"/,
+    /src=\{appPath\("\/smartisan\/mobile\/note_item_clip_normal\.png"\)\}/,
   );
   assert.match(sidebarSource, /className="note-list-swipe-delete"/);
   assert.match(sidebarSource, /className="note-list-image-indicator"/);

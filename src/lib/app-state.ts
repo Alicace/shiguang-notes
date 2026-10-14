@@ -1,10 +1,11 @@
+import { isNative } from "./fnos-client.js";
 import sampleMarkdown from "../../example/程序员狠话Vol.5.md?raw";
 import {
   createSmartisanWebTestWorkspace,
   SMARTISAN_WEB_TEST_DATA_ID,
   SMARTISAN_WEB_TEST_WORKSPACE_STORAGE_KEY,
 } from "../fixtures/smartisan-web-test-workspace.js";
-import type { NoteWorkspace } from "../types/app";
+import type { NoteWorkspace } from "../types/app.js";
 import { createNoteDocument, parseNoteWorkspace } from "./notes";
 import { consumeTestDataResetFromCurrentUrl } from "./test-data-url";
 import {
@@ -45,6 +46,7 @@ export {
 } from "./themes";
 
 export function isSmartisanWebTestDataMode(): boolean {
+  if (isNative) return false;
   return readSearchParam("testData") === SMARTISAN_WEB_TEST_DATA_ID;
 }
 
@@ -71,6 +73,10 @@ function readSearchParam(key: string): string | null {
 }
 
 export function getInitialNoteWorkspace(): NoteWorkspace {
+  if (isNative) {
+    const note = createNoteDocument("");
+    return { activeNoteId: note.id, folders: [], notes: [note], version: 1 };
+  }
   if (getRenderMode() === "playwright") {
     const note = createNoteDocument(FALLBACK_CONTENT);
     return {

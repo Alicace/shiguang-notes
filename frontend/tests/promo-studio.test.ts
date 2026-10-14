@@ -257,7 +257,7 @@ test("两个宣传图页面提供独立路由、上传控件和下载入口", ()
 
   assert.match(mainSource, /pathname === "\/promo\/editor"/);
   assert.match(mainSource, /pathname === "\/promo\/pages"/);
-  assert.match(viteConfig, /base:\s*"\/"/);
+  assert.match(viteConfig, /base:\s*process\.env\.VITE_FNOS_NATIVE === "1" \? "\/app\/fnnotes-m0\/" : "\/"/);
   assert.doesNotMatch(viteConfig, /base:\s*"\.\/"/);
   assert.match(editorMarkup, /单图聚焦/);
   assert.match(editorMarkup, /选择产品截图/);
