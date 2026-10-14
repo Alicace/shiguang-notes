@@ -21,6 +21,7 @@ fnnotes-m0/app/package.json
 fnnotes-m0/app/build-info.json
 fnnotes-m0/app/LICENSE
 fnnotes-m0/app/NOTICE
+fnnotes-m0/app/ICON-SOURCE.md
 *.fpk
 output/playwright/
 .playwright-cli/

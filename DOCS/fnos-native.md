@@ -1,6 +1,6 @@
 # 拾光便签完整原生适配
 
-日期：2026-10-14。上游 1.12.0；原生应用独立版本 0.2.1。
+日期：2026-10-14。上游 1.12.0；原生应用独立版本 0.2.2。
 
 ## 范围
 
@@ -16,6 +16,10 @@
 - `fnos/native/dev.mjs`：开发机模拟网关，1001/1002/1003 对应三个固定测试入口；不进入包。
 
 构建命令：`npm run fnos:build`；打包：`npm run fnos:pack`。开发机必须先准备 `.tools/native-runtime-linux` 的生产依赖；可用 `FNOS_RUNTIME_DIR` 指定。只复制实际安装的 Linux x64 运行依赖，不能用 macOS Sharp 交付 NAS。
+
+0.2.2 打包修复：Node 文件复制保留原软链接形式，生产运行目录清理所有 npm `.bin` 命令目录和不使用的 TypeScript 编译器；其余软链接直接阻止构建。旧包存在 9 条指向开发机 `/Users/...` 的链接，不能将本机 tar 能读出归档视为 NAS 解压兼容。`package-files.test.mjs` 覆盖绝对/相对、嵌套命令链接、编译器删除及意外外部链接。
+
+图标统一从 `public/smartisan-theme-icon.png` 缩放为 64/256 px，应用中心与桌面保持相同；资源来源与权利说明见 `fnos-icon.md`。
 
 ## 数据与权限
 
