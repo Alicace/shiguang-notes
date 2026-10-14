@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -eu
+"$(dirname "$0")/main" stop
+case "${wizard_m0_data:-keep}" in
+  keep) exit 0 ;;
+  delete)
+    : "${TRIM_PKGVAR:?}"
+    [ "$TRIM_PKGVAR" != / ] && [ ! -L "$TRIM_PKGVAR/notes" ] || exit 1
+    for FILE in "$TRIM_PKGVAR/notes/"*.json; do
+      NAME=${FILE##*/}; NAME=${NAME%.json}
+      case "$NAME" in ''|*[!0-9]*) continue ;; esac
+      if [ -f "$FILE" ]; then rm -f -- "$FILE"; fi
+    done
+    ;;
+  *) exit 1 ;;
+esac

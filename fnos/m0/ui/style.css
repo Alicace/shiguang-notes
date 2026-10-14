@@ -1,0 +1,47 @@
+:root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; color: #342e29; background: #f1eeea; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1500px; margin: auto; padding: 28px; }
+h1, h2, p { margin-top: 0; }
+h1 { font-size: 24px; margin-bottom: 4px; }
+h2 { font-size: 16px; }
+button, select { font: inherit; min-height: 44px; border: 1px solid #c9bfb4; border-radius: 9px; padding: 8px 15px; background: #fff; color: inherit; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+button:hover:enabled { background: #f6f1e9; }
+button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #af794b; outline-offset: 2px; }
+.app-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.app-header p { margin-bottom: 0; color: #7e746a; }
+.identity { margin-left: auto; font-size: 14px; overflow-wrap: anywhere; }
+.notice { background: #fff7df; border: 1px solid #e8d6a2; padding: 13px 17px; border-radius: 10px; margin-bottom: 18px; font-size: 14px; line-height: 1.6; }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+.toolbar label { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.toolbar [role=status] { font-size: 14px; color: #6d6255; }
+.workspace { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(340px, 1fr); gap: 22px; align-items: start; }
+.editor, .preview, .system-panel, .png-result { background: #fff; border: 1px solid #e1dad2; border-radius: 14px; padding: 20px; }
+textarea { width: 100%; min-height: 540px; resize: vertical; border: 1px solid #ded5cc; border-radius: 8px; padding: 16px; background: #fdfbf8; color: inherit; font-size: 16px; line-height: 1.75; }
+.note-card { position: relative; width: 100%; padding: 38px; background: #fbf7ed; color: #3e352d; border: 1px solid #d8cbbd; border-radius: 4px; font-size: 18px; line-height: 1.8; overflow-wrap: anywhere; }
+.note-card.night { background: #24211f; color: #ede5d8; border-color: #50483f; }
+.note-card h1 { font-size: 28px; line-height: 1.5; margin: 0 0 24px; }
+.note-card h2 { font-size: 23px; }
+.note-card p { margin: 0 0 18px; }
+.note-card ul, .note-card ol { padding-left: 27px; }
+.note-card blockquote { margin: 18px 0; padding-left: 18px; border-left: 3px solid #b39170; }
+.note-card pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 14px; background: #82745e18; }
+.note-card code { font-family: monospace; }
+.note-card table { border-collapse: collapse; width: 100%; font-size: 15px; }
+.note-card td, .note-card th { border: 1px solid #bcae9f; padding: 8px; }
+.note-card a { color: inherit; }
+.note-card img { max-width: 100%; max-height: 700px; object-fit: contain; }
+.note-footer { border-top: 1px solid #b3917044; display: flex; gap: 9px; align-items: center; padding-top: 20px; margin-top: 30px; font-size: 13px; color: #9b8063; }
+.export-root { position: fixed; left: -10000px; top: 0; width: 720px; pointer-events: none; }
+.export-root .note-card { width: 720px; }
+.system-panel, .png-result { margin-top: 22px; }
+.system-panel p, .png-result p { font-size: 14px; line-height: 1.7; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.folder { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.folder code { overflow-wrap: anywhere; }
+.png-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+.png-grid img { display: block; width: 100%; max-height: 420px; object-fit: contain; margin-bottom: 12px; }
+.empty { padding: 40px 0; }
+@media (max-width: 900px) { main { padding: 18px; } .workspace { grid-template-columns: 1fr; } textarea { min-height: 300px; } }
+@media (max-width: 480px) { main { padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); } .identity { max-width: 45%; } .editor, .preview, .system-panel, .png-result { padding: 14px; } .preview .note-card { padding: 22px; font-size: 16px; } .toolbar [role=status] { width: 100%; } }

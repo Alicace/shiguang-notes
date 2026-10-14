@@ -8,3 +8,13 @@ storage/images/*
 storage/data/*
 !storage/data/.gitkeep
 .playwright-mcp/
+fnos/m0/.dev-data/
+fnnotes-m0/app/web/
+fnnotes-m0/app/server/
+fnnotes-m0/app/build-info.json
+fnnotes-m0/app/LICENSE
+fnnotes-m0/app/NOTICE
+*.fpk
+output/playwright/
+.playwright-cli/
+.DS_Store

@@ -1,0 +1,12 @@
+[
+  {
+    "stepTitle": "测试数据处理",
+    "items": [
+      { "type": "tips", "helpText": "卸载前请自行保存测试正文。默认脚本不主动清理正文；系统卸载保留行为尚待真机验证。" },
+      { "type": "select", "field": "wizard_m0_data", "label": "应用脚本如何处理测试正文", "initValue": "keep", "options": [
+        { "label": "不主动清理", "value": "keep" },
+        { "label": "删除本预检版的测试正文", "value": "delete" }
+      ] }
+    ]
+  }
+]

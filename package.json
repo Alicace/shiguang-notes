@@ -23,13 +23,19 @@
     "test:backend": "node --import tsx --test --test-concurrency=1 backend/tests/*.test.ts",
     "test:dsh-plugin": "node --import tsx --test --test-concurrency=1 dsh-plugin/tests/*.test.ts",
     "benchmark:input": "node scripts/benchmark-input-latency.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "fnos:m0:build": "node fnos/m0/build.mjs",
+    "fnos:m0:pack": "node fnos/m0/build.mjs --pack",
+    "fnos:m0:dev": "node fnos/m0/dev.mjs",
+    "fnos:m0:test": "node --test fnos/m0/server.test.mjs && node --import tsx --test fnos/m0/png.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@trimjs/web-app": "0.5.0",
     "express": "^5.2.1",
+    "html-to-image": "1.11.13",
     "multer": "^2.1.1",
     "playwright": "^1.58.2",
     "qiniu": "^7.15.2",

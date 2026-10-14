@@ -1,0 +1,14 @@
+{
+  ".url": {
+    "fnnotes-m0.main": {
+      "title": "拾光便签",
+      "icon": "images/icon_{0}.png",
+      "type": "iframe",
+      "protocol": "",
+      "gatewayPrefix": "/app/fnnotes-m0",
+      "gatewaySocket": "app.sock",
+      "url": "/app/fnnotes-m0/",
+      "allUsers": true
+    }
+  }
+}

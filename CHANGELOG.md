@@ -2,6 +2,12 @@
 
 本文件记录锤子便签中值得用户关注的变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 新增
+
+- 新增飞牛原生 M0 预检应用：使用系统网关身份按用户保存正文、验证文件授权，并在客户端生成和保存 PNG；预检包不包含 NAS 后台浏览器，完整便签与共享空间尚未接入。
+
 ## [1.12.0] - 2026-10-11
 
 ### 新增
@@ -312,6 +318,7 @@
 - PC 版便签操作栏右侧按钮调整为“AI、删除、分享”的顺序，与 APP 版详情操作保持一致。
 - 重置 Hermes 安装链接前会明确提示旧链接立即失效，并要求二次确认，避免误触轮换。
 
+[未发布]: https://github.com/zhaoolee/notes/compare/1.12.0...HEAD
 [1.12.0]: https://github.com/zhaoolee/notes/compare/1.11.2...1.12.0
 [1.11.2]: https://github.com/zhaoolee/notes/compare/1.11.1...1.11.2
 [1.11.1]: https://github.com/zhaoolee/notes/compare/1.11.0...1.11.1

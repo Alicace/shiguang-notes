@@ -1,0 +1,15 @@
+appname=fnnotes-m0
+version=0.1.0
+display_name=拾光便签
+desc=验证飞牛身份、用户隔离保存、文件授权和客户端PNG导出。M0预检版本，完整便签与共享空间尚未接入。
+platform=x86
+source=thirdparty
+maintainer=拾光便签项目
+distributor=Local Build
+os_min_version=1.2.0800
+install_dep_apps=nodejs_v22
+desktop_uidir=ui
+desktop_applaunchname=fnnotes-m0.main
+micro_app=true
+ctl_stop=true
+checkport=false

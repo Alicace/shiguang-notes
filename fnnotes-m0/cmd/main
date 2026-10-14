@@ -1,0 +1,58 @@
+#!/bin/bash
+set -eu
+umask 077
+: "${TRIM_APPDEST:?}" "${TRIM_PKGVAR:?}"
+export PATH="/var/apps/nodejs_v22/target/bin:$PATH"
+MAIN_FILE="$TRIM_APPDEST/server/main.mjs"
+PID_FILE="$TRIM_PKGVAR/app.pid"
+READY_FILE="$TRIM_PKGVAR/ready.pid"
+LOG_FILE="$TRIM_PKGVAR/app.log"
+SOCKET_FILE="$TRIM_APPDEST/app.sock"
+fail() {
+  if [ -n "${TRIM_TEMP_LOGFILE:-}" ]; then printf '%s\n' "$1" > "$TRIM_TEMP_LOGFILE"; fi
+  printf '%s\n' "$1" >&2
+  exit 1
+}
+running() {
+  [ -f "$PID_FILE" ] || return 1
+  PID=$(cat "$PID_FILE")
+  case "$PID" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$PID" -gt 1 ] && kill -0 "$PID" 2>/dev/null || return 1
+  COMMAND=$(ps -p "$PID" -o args= 2>/dev/null) || return 1
+  case "$COMMAND" in *"$MAIN_FILE"*) return 0 ;; *) return 1 ;; esac
+}
+stop() {
+  if running; then
+    kill -TERM "$PID"
+    COUNT=0
+    while running && [ "$COUNT" -lt 10 ]; do sleep 1; COUNT=$((COUNT + 1)); done
+    if running; then kill -KILL "$PID"; fi
+  fi
+  rm -f "$PID_FILE" "$READY_FILE"
+  if [ -S "$SOCKET_FILE" ]; then rm -f "$SOCKET_FILE"; fi
+}
+case "${1:-}" in
+  start)
+    [ "$(id -u)" -ne 0 ] || fail "请使用专用包用户运行，不能以 root 启动。"
+    if running && [ -S "$SOCKET_FILE" ] && [ -f "$READY_FILE" ] && [ "$(cat "$READY_FILE")" = "$PID" ]; then exit 0; fi
+    if running; then fail "服务正在运行但尚未就绪，请先停止后再启动。"; fi
+    command -v node >/dev/null || fail "缺少 Node.js 22 运行时。"
+    mkdir -p "$TRIM_PKGVAR"
+    rm -f "$READY_FILE"
+    node "$MAIN_FILE" >> "$LOG_FILE" 2>&1 &
+    printf '%s' "$!" > "$PID_FILE"
+    COUNT=0
+    while [ "$COUNT" -lt 10 ]; do
+      if running && [ -S "$SOCKET_FILE" ] && [ -f "$READY_FILE" ] && [ "$(cat "$READY_FILE")" = "$PID" ]; then exit 0; fi
+      sleep 1; COUNT=$((COUNT + 1))
+    done
+    stop
+    fail "服务未能启动，请查看应用日志。"
+    ;;
+  stop) stop ;;
+  status)
+    if running && [ -S "$SOCKET_FILE" ] && [ -f "$READY_FILE" ] && [ "$(cat "$READY_FILE")" = "$PID" ]; then exit 0; fi
+    exit 3
+    ;;
+  *) exit 1 ;;
+esac
