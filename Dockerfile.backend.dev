@@ -1,0 +1,20 @@
+FROM mcr.microsoft.com/playwright:v1.58.2-noble
+
+WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3-pip \
+  && python3 -m pip install --break-system-packages --no-cache-dir "fonttools[woff]" \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+ENV PORT=3001
+ENV EXPORT_APP_URL=http://frontend:15173
+ENV IMAGE_STORAGE_DIR=/app/storage/images
+ENV DATA_STORAGE_DIR=/app/storage/data
+
+EXPOSE 3001
+
+CMD ["sh", "scripts/dev-entrypoint.sh", "backend", "npm", "run", "backend:watch"]
