@@ -1,0 +1,332 @@
+.app-update-dialog-backdrop {
+  position: fixed;
+  z-index: 180;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(47, 38, 31, 0.35);
+  backdrop-filter: blur(7px);
+}
+
+.app-update-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 28px 80px rgba(47, 35, 24, 0.3);
+}
+
+.app-update-dialog-header {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 32px;
+  gap: 14px;
+  align-items: center;
+  padding: 22px 24px 16px;
+}
+
+.app-update-dialog-header img {
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  object-fit: contain;
+}
+
+.app-update-dialog-header h2 {
+  margin: 3px 0 0;
+  font-size: 20px;
+  line-height: 27px;
+}
+
+.app-update-eyebrow {
+  color: #6d8c29;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.app-update-dialog-header > button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font: 22px/32px var(--ui-font);
+}
+
+.app-update-dialog-header > button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.app-update-summary {
+  margin: 0;
+  padding: 0 24px 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 21px;
+}
+
+.app-update-release-notes {
+  margin: 0 24px 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 88%, var(--bg));
+}
+
+.app-update-release-notes summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app-update-release-notes ul {
+  margin: 12px 0;
+  padding-left: 19px;
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 19px;
+}
+
+.app-update-release-notes p {
+  margin: 12px 0;
+  font-size: 12px;
+  line-height: 19px;
+}
+
+.app-update-release-notes a {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.app-update-progress-card {
+  margin: 0 24px 18px;
+  padding: 15px 16px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+}
+
+.app-update-progress-heading,
+.app-update-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.app-update-progress-heading {
+  font-size: 12px;
+}
+
+.app-update-progress-heading span {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.app-update-progress-track {
+  height: 9px;
+  margin: 11px 0 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.app-update-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7f9d3a, #b19a4d);
+  transition: width 240ms ease;
+}
+
+.app-update-progress-meta {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.app-update-error {
+  margin: 0 24px 18px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(174, 77, 65, 0.1);
+  color: #a54e43;
+  font-size: 12px;
+  line-height: 19px;
+}
+
+.app-update-dialog-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--panel-border);
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.app-update-dialog-actions button,
+.app-update-dialog-actions a {
+  min-height: 38px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--panel-border);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 600 12px/20px var(--ui-font);
+  text-decoration: none;
+}
+
+.app-update-dialog-actions .is-primary {
+  border-color: #6d8c29;
+  background: #6d8c29;
+  color: #fff;
+}
+
+.app-update-dialog-actions button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+@media (max-width: 640px) {
+  .app-update-dialog-backdrop {
+    padding: 12px;
+    align-items: end;
+  }
+
+  .app-update-dialog {
+    width: 100%;
+    max-height: calc(100vh - 24px);
+    border-radius: 18px 18px 12px 12px;
+  }
+
+  .app-update-dialog-header {
+    grid-template-columns: 50px minmax(0, 1fr) 32px;
+    padding: 18px 18px 14px;
+  }
+
+  .app-update-dialog-header img {
+    width: 50px;
+    height: 50px;
+  }
+
+  .app-update-summary,
+  .app-update-release-notes,
+  .app-update-progress-card,
+  .app-update-error {
+    margin-right: 18px;
+    margin-left: 18px;
+  }
+
+  .app-update-dialog-actions {
+    padding: 14px 18px 18px;
+  }
+}
+
+.settings-update-interval {
+  margin: 8px 18px 0;
+  padding: 12px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 14px;
+  align-items: center;
+  border-top: 1px solid color-mix(in srgb, var(--panel-border) 72%, transparent);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-update-interval select {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  outline: none;
+  background: var(--panel);
+  color: var(--ink);
+  font: 600 12px var(--ui-font);
+}
+
+.settings-update-progress {
+  padding: 0 18px 12px;
+  display: grid;
+  gap: 7px;
+}
+
+.settings-update-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.settings-update-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7f9d3a, #b19a4d);
+  transition: width 220ms ease;
+}
+
+.settings-update-progress small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.settings-update-release-notes {
+  margin: 2px 18px 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 9px;
+}
+
+.settings-update-release-notes summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.settings-update-release-notes p {
+  margin: 9px 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 18px;
+  white-space: pre-wrap;
+}
+
+.settings-update-release-notes a {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.settings-update-actions .settings-update-release-link {
+  min-height: 34px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 600 12px/22px var(--ui-font);
+  text-decoration: none;
+}

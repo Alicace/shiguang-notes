@@ -115,16 +115,21 @@ test("程序信息不返回凭据，后台截图与管理员接口在原生模�
 test("目录授权刷新后从持久化记录恢复，浏览器不能写入任意路径", async () => {
   const uid = 1010;
   const token = await session(uid);
+  const rememberedFolder = path.join(directory, "remembered-photos");
+  await mkdir(rememberedFolder, { recursive: true });
   await writeFile(
     path.join(directory, "data", "authorized-folders.json"),
-    JSON.stringify({ [`nas-${uid}`]: ["/vol1/photos"] }),
+    JSON.stringify({ [`nas-${uid}`]: [rememberedFolder] }),
     { mode: 0o600 },
   );
 
   const remembered = await request("/api/authorized-folders", { uid });
   assert.equal(remembered.status, 200);
   assert.equal(remembered.data.configured, false);
-  assert.deepEqual(remembered.data.paths, ["/vol1/photos"]);
+  assert.equal(
+    await realpath(remembered.data.paths[0]),
+    await realpath(rememberedFolder),
+  );
 
   const rejected = await request("/api/authorized-folders", {
     method: "POST",
@@ -132,7 +137,10 @@ test("目录授权刷新后从持久化记录恢复，浏览器不能写入任�
     uid,
     body: { paths: ["/etc"] },
   });
-  assert.deepEqual(rejected.data.paths, ["/vol1/photos"]);
+  assert.equal(
+    await realpath(rejected.data.paths[0]),
+    await realpath(rememberedFolder),
+  );
   assert.equal((await request("/api/fnos/read-image", {
     method: "POST",
     token,
@@ -141,7 +149,7 @@ test("目录授权刷新后从持久化记录恢复，浏览器不能写入任�
   })).status, 403);
 });
 
-test("宿主选择器可登记真实文件，缺少 Origin 的同源写请求仍由 CSRF 保护", async () => {
+test("目录授权只接受系统 API 确认的路径，缺少 Origin 的同源写请求仍由 CSRF 保护", async () => {
   const uid = 1011;
   const token = await session(uid);
   const folder = path.join(directory, "picked-folder");
@@ -155,17 +163,22 @@ test("宿主选择器可登记真实文件，缺少 Origin 的同源写请求仍
     ),
   );
   const realImagePath = await realpath(imagePath);
+  await writeFile(
+    path.join(directory, "data", "authorized-folders.json"),
+    JSON.stringify({ [`nas-${uid}`]: [folder] }),
+    { mode: 0o600 },
+  );
 
   const remembered = await request("/api/authorized-folders", {
     method: "POST",
     token,
     uid,
     body: { paths: [imagePath] },
-    extra: { "X-Fnnotes-Host-Picker": "1" },
     omitOrigin: true,
   });
   assert.equal(remembered.status, 200);
-  assert.ok(remembered.data.paths.includes(realImagePath), JSON.stringify(remembered.data));
+  assert.deepEqual(remembered.data.paths, [folder]);
+  assert.ok(!remembered.data.paths.includes(realImagePath), JSON.stringify(remembered.data));
 
   const image = await request("/api/fnos/read-image", {
     method: "POST",
@@ -308,12 +321,33 @@ test("用户管理：只有 NAS 管理员能建号、停用与删除，独立账
   assert.equal(saved.status, 200);
   assert.equal(saved.headers["x-shiguang-user"], account.id);
   assert.equal((await request("/api/workspace")).data.workspace.notes[0].markdown, privateBefore);
+  const installLink = await request("/api/hermes-skill/install-link", {
+    method: "POST",
+    token: userToken,
+    extra: {
+      Cookie: cookie,
+      Origin: "http://nas.test",
+      "X-Shiguang-User": account.id,
+    },
+  });
+  assert.equal(installLink.status, 200);
+  const installPath = new URL(installLink.data.installUrl).pathname.slice(prefix.length);
 
   // 停用：已签发的会话立即被拒，重新登录也失败。
   const disabled = await request(`/api/fnos/users/${account.id}`, { uid: 1003, method: "PATCH", token: adminToken, body: { disabled: true } });
   assert.equal(disabled.status, 200);
   assert.equal(disabled.data.user.disabled, true);
   assert.equal((await request("/api/workspace", { extra: asTenant })).status, 403);
+  const disabledInstall = await request(installPath);
+  assert.equal(
+    disabledInstall.status,
+    410,
+    JSON.stringify({
+      installUrl: installLink.data.installUrl,
+      installPath,
+      body: disabledInstall.data,
+    }),
+  );
   assert.equal((await request("/api/auth/login", { method: "POST", extra: sameOrigin, body: { username: account.username, password: created.data.initialPassword } })).status, 401);
 
   // 重新启用后可登录；重置密码会作废旧密码。

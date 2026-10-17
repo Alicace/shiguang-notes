@@ -59,12 +59,10 @@ export function FileAccessPanel() {
   // 应用数据目录，刷新页面或从共享空间返回后仍能读回同一个列表。
   async function rememberFolders(paths: string[]): Promise<string[]> {
     if (!paths.length) return [];
-    const options = nativeWrite({ paths }, "POST");
-    options.headers = {
-      ...(options.headers as Record<string, string>),
-      "X-Fnnotes-Host-Picker": "1",
-    };
-    const data = await nativeJson<{ paths: string[] }>("/api/authorized-folders", options);
+    const data = await nativeJson<{ paths: string[] }>(
+      "/api/authorized-folders",
+      nativeWrite({ paths }, "POST"),
+    );
     return data.paths;
   }
 
@@ -163,8 +161,7 @@ export function FileAccessPanel() {
         <div className="settings-card native-form-card">
           {session && !apiConfigured ? (
             <p className="native-warning" role="alert">
-              ACL 自动检查接口还没拿到飞牛的系统凭据；目录选择和授权仍可直接使用。
-              点「选择并授权目录」后，应用会保存宿主选择器返回的真实路径。若需要自动复核读写权限，
+              ACL 自动检查接口还没拿到飞牛的系统凭据；目录选择器可以打开，但授权路径需要等系统 API 就绪后才会登记。
               可在应用数据目录放 <code>api-token</code>，或设置环境变量{" "}
               <code>TRIM_API_TOKEN</code>。
             </p>

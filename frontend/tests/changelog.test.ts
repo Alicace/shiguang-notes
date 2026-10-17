@@ -32,7 +32,7 @@ test("CHANGELOG 使用固定的人类可读格式记录版本", () => {
   assert.match(changelog, /^# 更新日志\n/);
   assert.equal(
     secondLevelHeadings[hasUnreleasedSection ? 1 : 0],
-    "[0.9.1] - 2026-10-17",
+    "[0.9.2] - 2026-10-17",
   );
   assert.ok(
     secondLevelHeadings.includes(`[${packageVersion.version}] - 2026-10-11`),
@@ -153,6 +153,17 @@ test("changelog 解析器保留便签分节并解析版本比较链接", () => {
     heading: string;
     content: RegExp[];
   }> = [
+    {
+      version: "0.9.2",
+      heading:
+        "[0.9.2](https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.2) - 2026-10-17",
+      content: [
+        /打开应用.*自动检查.*每次启动.*每 6 小时.*每 3 天/s,
+        /更新提示.*更新内容.*完整发布页面/s,
+        /后台任务.*百分比.*线路.*实时速度/s,
+        /SHA-256.*飞牛安装器.*自动刷新/s,
+      ],
+    },
     {
       version: "0.9.1",
       heading:
@@ -433,8 +444,8 @@ test("changelog 独立页面复用拾光便签预览结构", () => {
 test("前端入口和生产镜像都包含 changelog 页面所需文件", () => {
   const mainSource = readFileSync("src/main.tsx", "utf8");
   const styles = readFileSync("src/styles.css", "utf8");
-  const frontendDockerfile = readFileSync("Dockerfile.frontend", "utf8");
-  const appDockerfile = readFileSync("Dockerfile.app", "utf8");
+  const frontendDockerfile = readFileSync("docker/Dockerfile.frontend", "utf8");
+  const appDockerfile = readFileSync("docker/Dockerfile.app", "utf8");
 
   assert.match(mainSource, /import changelogMarkdown from "\.\.\/CHANGELOG\.md\?raw"/);
   assert.match(mainSource, /pathname === "\/changelog"/);

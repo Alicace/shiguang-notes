@@ -14,6 +14,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import sharp, { type Metadata } from "sharp";
 import { NoteSheet } from "../src/components/NoteSheet.js";
+import { downloadRemoteImage } from "./security/remote-image.js";
 import { WechatArticle } from "../src/components/WechatArticle.js";
 import { normalizeNoteFontScale } from "../src/lib/note-typography.js";
 import {
@@ -89,12 +90,11 @@ import {
   type WechatPermanentImage,
 } from "./wechat-official.js";
 import { installNativeGateway, installNativeRoutes, nativeContext, nativeMode, nativePrefix, NativeSpaces } from "./fnos.js";
-import { LoginThrottle, loginThrottleKeys } from "./login-throttle.js";
+import { LoginThrottle, loginThrottleKeys } from "./security/login-throttle.js";
 
 interface ExportRequestBody {
   fontScale?: number;
   markdown?: string;
-  markdownPath?: string;
   theme?: string;
   filename?: string;
   footerBrand?: string;
@@ -109,7 +109,6 @@ interface ImageImportRequestBody {
 interface ArchiveRequestBody {
   fontScale?: number;
   markdown?: string;
-  markdownPath?: string;
   theme?: string;
   footerBrand?: string;
   footerLogoUrl?: string;
@@ -123,7 +122,6 @@ interface WorkspaceArchiveRequestBody {
 interface WechatRequestBody {
   fontScale?: number;
   markdown?: string;
-  markdownPath?: string;
   theme?: string;
   footerBrand?: string;
   footerLogoUrl?: string;
@@ -592,6 +590,7 @@ async function getAuthenticatedSkillUser(
   const account = await notesDataStore.getUserById(session.id);
 
   return account &&
+    !account.disabled &&
     account.passwordVersion === session.passwordVersion &&
     account.skillTokenVersion === session.skillTokenVersion &&
     safeStringEqual(
@@ -616,7 +615,7 @@ async function createSkillTokenForUser(user: AuthUser): Promise<string | null> {
 
   const account = await notesDataStore.getUserById(user.id);
 
-  return account
+  return account && !account.disabled
     ? createSkillToken(
         user,
         account.passwordVersion,
@@ -646,7 +645,7 @@ async function getSkillTokenForHermesInstallTicket(
   }
 
   const account = await notesDataStore.getUserById(ownerId);
-  return account
+  return account && !account.disabled
     ? createSkillToken(
         {
           id: account.id,
@@ -872,13 +871,7 @@ async function resolveMarkdown(body: ExportRequestBody | ArchiveRequestBody): Pr
   if (typeof body.markdown === "string") {
     return body.markdown;
   }
-  if (nativeMode) throw new Error("原生应用只接受客户端提交的 Markdown，不允许读取服务端任意路径。");
-
-  if (typeof body.markdownPath === "string" && body.markdownPath.trim()) {
-    return fs.readFile(body.markdownPath, "utf8");
-  }
-
-  throw new Error("Missing markdown or markdownPath");
+  throw new Error("Missing markdown");
 }
 
 function resolveTheme(body: ExportRequestBody): NoteCardThemeId {
@@ -1016,6 +1009,38 @@ function getDataUrlImage(source: string): ImageSource | null {
   };
 }
 
+async function readFileInsideRoot(root: string, candidate: string): Promise<Buffer> {
+  const [realRoot, realFile] = await Promise.all([
+    fs.realpath(root),
+    fs.realpath(candidate),
+  ]);
+  const relative = path.relative(realRoot, realFile);
+  if (
+    !relative ||
+    relative === ".." ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error("文件路径超出允许的目录");
+  }
+  return fs.readFile(realFile);
+}
+
+function applyStaticImageSecurityHeaders(
+  response: Response,
+  filePath: string,
+): void {
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  if (path.extname(filePath).toLowerCase() === ".svg") {
+    // SVG can contain active content when opened as a document. Sandboxing keeps
+    // it usable as an image without giving it same-origin script execution.
+    response.setHeader(
+      "Content-Security-Policy",
+      "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:",
+    );
+  }
+}
+
 async function readRootRelativeArchiveImage(source: string): Promise<ImageSource | null> {
   let pathname = "";
 
@@ -1028,10 +1053,16 @@ async function readRootRelativeArchiveImage(source: string): Promise<ImageSource
   if (nativeMode) {
     if (pathname.startsWith(nativePrefix + "/")) pathname = pathname.slice(nativePrefix.length);
     if (pathname.startsWith("/images/")) {
-      const match = pathname.match(/^\/images\/(nas-\d+|space-[a-f0-9-]{36})\/([a-f0-9]{64}\.[a-z0-9]+)$/);
+      const match = pathname.match(/^\/images\/(nas-\d+|space-[a-f0-9-]{36}|[a-f0-9-]{36})\/([a-f0-9]{64}\.[a-z0-9]+)$/);
       const user = nativeContext.getStore()?.user;
       if (!match || !user || !(await nativeSpaces.access(user.id, match[1]))) throw new Error("无权读取该图片。");
-      return { buffer: await fs.readFile(path.join(imagesDir, match[1], match[2])), filename: match[2] };
+      return {
+        buffer: await readFileInsideRoot(
+          imagesDir,
+          path.join(imagesDir, match[1], match[2]),
+        ),
+        filename: match[2],
+      };
     }
   }
 
@@ -1040,7 +1071,7 @@ async function readRootRelativeArchiveImage(source: string): Promise<ImageSource
     const filePath = path.join(imagesDir, filename);
 
     return {
-      buffer: await fs.readFile(filePath),
+      buffer: await readFileInsideRoot(imagesDir, filePath),
       filename,
     };
   }
@@ -1052,7 +1083,7 @@ async function readRootRelativeArchiveImage(source: string): Promise<ImageSource
   }
 
   return {
-    buffer: await fs.readFile(filePath),
+    buffer: await readFileInsideRoot(publicDir, filePath),
     filename: path.basename(pathname),
   };
 }
@@ -1060,14 +1091,14 @@ async function readRootRelativeArchiveImage(source: string): Promise<ImageSource
 async function readRelativeArchiveImage(source: string): Promise<ImageSource | null> {
   if (nativeMode) return null;
   const [pathname] = source.split(/[?#]/, 1);
-  const filePath = path.resolve(rootDir, pathname);
+  const filePath = path.resolve(publicDir, pathname);
 
-  if (!filePath.startsWith(`${rootDir}${path.sep}`)) {
+  if (!filePath.startsWith(`${publicDir}${path.sep}`)) {
     return null;
   }
 
   return {
-    buffer: await fs.readFile(filePath),
+    buffer: await readFileInsideRoot(publicDir, filePath),
     filename: path.basename(pathname),
   };
 }
@@ -1125,6 +1156,37 @@ function collectMarkdownImageSources(markdown: string): string[] {
   }
 
   return Array.from(new Set(sources));
+}
+
+async function inlineExternalExportImages(
+  markdown: string,
+  publicBaseUrl: string,
+): Promise<string> {
+  let output = markdown;
+  for (const source of collectMarkdownImageSources(markdown)) {
+    if (!/^https?:\/\//i.test(source) && !source.startsWith("//")) {
+      continue;
+    }
+    const absoluteSource = source.startsWith("//") ? `https:${source}` : source;
+    const image = await resolveArchiveImage(absoluteSource, publicBaseUrl);
+    if (!image) continue;
+    const extension = detectImageFormat(
+      image.buffer,
+      image.mimeType,
+      image.filename,
+    );
+    if (!extension) {
+      throw new Error("导出图片格式无法识别");
+    }
+    const mimeType =
+      extension === "jpg" ? "image/jpeg" : `image/${extension}`;
+    output = replaceAll(
+      output,
+      source,
+      `data:${mimeType};base64,${image.buffer.toString("base64")}`,
+    );
+  }
+  return output;
 }
 
 function replaceAll(value: string, search: string, replacement: string): string {
@@ -3387,30 +3449,18 @@ function detectImageFormat(
 }
 
 async function downloadImageFromUrl(sourceUrl: string): Promise<ImageSource> {
-  const response = await fetch(sourceUrl);
-
-  if (!response.ok) {
-    throw new Error(`图片下载失败（${response.status} ${response.statusText || ""}）`.trim());
-  }
-
-  const contentLength = Number(response.headers.get("content-length") || "0");
-
-  if (contentLength > maxImageSizeBytes) {
-    throw new Error(`图片过大，单张图片不能超过 ${Math.floor(maxImageSizeBytes / 1024 / 1024)}MB。`);
-  }
-
-  const arrayBuffer = await response.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-
-  if (buffer.length > maxImageSizeBytes) {
-    throw new Error(`图片过大，单张图片不能超过 ${Math.floor(maxImageSizeBytes / 1024 / 1024)}MB。`);
-  }
-
-  const filename = path.basename(new URL(response.url).pathname) || "remote-image";
+  const remote = await downloadRemoteImage(sourceUrl, maxImageSizeBytes, {
+    allowPrivateHost:
+      process.env.NODE_ENV === "test"
+        ? process.env.SHIGUANG_TEST_IMAGE_HOST
+        : undefined,
+  });
+  const filename =
+    path.basename(new URL(remote.finalUrl).pathname) || "remote-image";
 
   return {
-    buffer,
-    mimeType: response.headers.get("content-type"),
+    buffer: remote.buffer,
+    mimeType: remote.contentType,
     filename,
   };
 }
@@ -3494,6 +3544,22 @@ async function renderNotePng(markdown: string, renderUrl: string): Promise<Buffe
   });
 
   try {
+    const renderOrigin = new URL(renderUrl).origin;
+    await page.route("**/*", (route) => {
+      try {
+        const requestUrl = new URL(route.request().url());
+        if (
+          requestUrl.origin === renderOrigin ||
+          requestUrl.protocol === "data:" ||
+          requestUrl.protocol === "blob:"
+        ) {
+          return route.continue();
+        }
+      } catch {
+        // Fall through and block malformed or non-URL requests.
+      }
+      return route.abort();
+    });
     await page.goto(renderUrl, {
       waitUntil: "domcontentloaded",
     });
@@ -4157,6 +4223,18 @@ function assertWechatDraftContentLimits(html: string): void {
 const app = express();
 app.set("trust proxy", 1);
 if (nativeMode) installNativeGateway(app, notesDataStore, nativeSpaces);
+else if (process.env.NODE_ENV === "production") {
+  app.use((_request: Request, response: Response, next: NextFunction) => {
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("X-Frame-Options", "SAMEORIGIN");
+    response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    response.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; connect-src 'self' https://github.com https://raw.githubusercontent.com https://ghfast.top https://gh-proxy.com https://ghproxy.net https://github.moeyy.xyz https://gh.llkk.cc https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
+    );
+    next();
+  });
+}
 
 function isPublicApiRequestWhenLoginRequired(request: Request): boolean {
   if (request.method === "GET") {
@@ -4191,6 +4269,11 @@ app.use((request: Request, response: Response, next: NextFunction) => {
     return;
   }
 
+  next();
+});
+
+app.use("/api", (_request: Request, response: Response, next: NextFunction) => {
+  response.setHeader("Cache-Control", "private, no-store");
   next();
 });
 
@@ -4261,9 +4344,17 @@ if (nativeMode) {
   installNativeRoutes(app, nativeSpaces, notesDataStore);
   app.use("/images/:scope", async (request: Request, response: Response, next: NextFunction) => {
     if (!(await nativeSpaces.access(nativeContext.getStore()!.user.id, String(request.params.scope)))) { response.sendStatus(403); return; }
-    express.static(path.join(imagesDir, String(request.params.scope)), { fallthrough: false })(request, response, next);
+    express.static(path.join(imagesDir, String(request.params.scope)), {
+      fallthrough: false,
+      setHeaders: applyStaticImageSecurityHeaders,
+    })(request, response, next);
   });
-} else app.use("/images", express.static(imagesDir, { fallthrough: false, immutable: true, maxAge: "1y" }));
+} else app.use("/images", express.static(imagesDir, {
+  fallthrough: false,
+  immutable: true,
+  maxAge: "1y",
+  setHeaders: applyStaticImageSecurityHeaders,
+}));
 
 app.get("/api/auth/session", async (request: Request, response: Response) => {
   const user = await getAuthenticatedUser(request);
@@ -4486,7 +4577,7 @@ async function respondWithHermesInstallLink(
   const installPath =
     `/api/hermes-skill/install/${ticket}/notes-workspace-api.zip`;
   response.json({
-    installUrl: new URL(installPath, `${publicBaseUrl}/`).toString(),
+    installUrl: `${publicBaseUrl}${installPath}`,
   });
 }
 
@@ -4640,15 +4731,35 @@ app.post(
     }
 
     const credentials = resolveLoginCredentials(request.body);
-    const user = authenticateSuperAdmin(credentials);
 
-    if (!user) {
-      response.status(credentials ? 401 : 400).json({
-        error: credentials ? "管理员用户名或密码错误。" : "请输入用户名和密码。",
-      });
+    if (!credentials) {
+      response.status(400).json({ error: "请输入管理员用户名和密码。" });
       return;
     }
 
+    const throttleKeys = loginThrottleKeys(
+      credentials.username,
+      loginClientKey(request),
+    );
+    const blockedSeconds = loginThrottle.check(throttleKeys);
+
+    if (blockedSeconds > 0) {
+      respondThrottled(response, blockedSeconds);
+      return;
+    }
+
+    const user = authenticateSuperAdmin(credentials);
+
+    if (!user) {
+      const retrySeconds = loginThrottle.recordFailure(throttleKeys);
+      console.warn(
+        `[auth] 管理员登录失败 user=${credentials.username} client=${loginClientKey(request)} retryAfter=${retrySeconds}s`,
+      );
+      response.status(401).json({ error: "管理员用户名或密码错误。" });
+      return;
+    }
+
+    loginThrottle.clear(throttleKeys);
     setAuthenticatedSession(
       request,
       response,
@@ -5033,10 +5144,13 @@ app.post(
       const theme = resolveTheme(body);
       const fontScale = normalizeNoteFontScale(body.fontScale);
       const renderUrl = getRenderUrl(request, theme, resolveFooterConfig(body), fontScale);
-      const markdown = normalizeRenderableImageUrls(
-        await resolveMarkdown(body),
-        request,
-        renderUrl,
+      const markdown = await inlineExternalExportImages(
+        normalizeRenderableImageUrls(
+          await resolveMarkdown(body),
+          request,
+          renderUrl,
+        ),
+        getPublicBaseUrl(request),
       );
       const requestedFilename = resolveExportFilename(body.filename);
 

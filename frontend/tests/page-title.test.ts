@@ -16,7 +16,7 @@ test("域名访问使用线上标题", () => {
 
 test("IPv4 和 IPv6 地址访问使用本地化标题", () => {
   assert.equal(getPageTitle("127.0.0.1"), IP_PAGE_TITLE);
-  assert.equal(getPageTitle("192.168.1.23"), IP_PAGE_TITLE);
+  assert.equal(getPageTitle("192.0.2.23"), IP_PAGE_TITLE);
   assert.equal(getPageTitle("[::1]"), IP_PAGE_TITLE);
   assert.equal(getPageTitle("2001:db8::1"), IP_PAGE_TITLE);
   assert.equal(IP_PAGE_TITLE, "本地化拾光便签");

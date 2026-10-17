@@ -1,3 +1,4 @@
+// 版本清单解析、校验与下载来源选择集中在更新模块，避免散落在设置界面。
 const buildEnvironment = (import.meta as ImportMeta & {
   env?: Record<string, string>;
 }).env;
@@ -142,11 +143,8 @@ export function updateManifestSources(): string[] {
   const raw = `https://raw.githubusercontent.com/${repository}/main/version.json`;
   const latest = `https://github.com/${repository}/releases/latest/download/version.json`;
   return [
-    `https://ghfast.top/${latest}`,
     latest,
-    `https://ghfast.top/${raw}`,
     raw,
-    `https://cdn.jsdelivr.net/gh/${repository}@main/version.json`,
   ];
 }
 

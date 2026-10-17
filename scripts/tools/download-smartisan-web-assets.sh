@@ -2,8 +2,9 @@
 
 set -euo pipefail
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 asset_base_url="https://static.smartisanos.cn/cloud/note/img"
-asset_output_dir="public/smartisan/web"
+asset_output_dir="${repo_root}/public/smartisan/web"
 
 assets=(
   "all_icons_ab3d0991b9.png"

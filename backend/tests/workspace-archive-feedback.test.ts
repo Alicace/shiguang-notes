@@ -130,6 +130,8 @@ test("整体导出保留目录、Markdown、相关图片和真实任务进度", 
     cwd: process.cwd(),
     env: {
       ...process.env,
+      NODE_ENV: "test",
+      SHIGUANG_TEST_IMAGE_HOST: `127.0.0.1:${imageAddress.port}`,
       DATA_STORAGE_DIR: dataDir,
       IMAGE_STORAGE_DIR: storageDir,
       PORT: String(port),

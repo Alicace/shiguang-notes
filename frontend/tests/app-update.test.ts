@@ -5,7 +5,8 @@ import {
   parseUpdateManifest,
   PROJECT_REPOSITORY_URL,
   updateManifestSources,
-} from "../../src/lib/app-update.js";
+} from "../../src/updates/app-update.js";
+import { isUpdateCheckDue } from "../../src/updates/update-preferences.js";
 
 const sha256 = "a".repeat(64);
 
@@ -14,7 +15,12 @@ test("项目关于页默认指向维护者的 GitHub 仓库", () => {
     PROJECT_REPOSITORY_URL,
     "https://github.com/Alicace/shiguang-notes",
   );
-  assert.ok(updateManifestSources()[0].startsWith("https://ghfast.top/"));
+  assert.ok(
+    updateManifestSources()[0].startsWith(
+      "https://github.com/Alicace/shiguang-notes/releases/latest/download/",
+    ),
+  );
+  assert.ok(updateManifestSources().every((url) => !url.includes("ghfast.top")));
   assert.ok(
     updateManifestSources().some((url) =>
       url.includes("Alicace/shiguang-notes/main/version.json"),
@@ -31,6 +37,14 @@ test("版本比较按数字段处理，不把 0.10 判成小于 0.9", () => {
   assert.equal(isNewerVersion("v1.0.0", "0.99.99"), true);
   assert.equal(isNewerVersion("0.9.0", "0.9.0"), false);
   assert.equal(isNewerVersion("bad", "0.9.0"), false);
+});
+
+test("启动时立即检查，后台按用户选择的小时间隔复查", () => {
+  const now = 10_000_000;
+  assert.equal(isUpdateCheckDue(0, now, now), true);
+  assert.equal(isUpdateCheckDue(6, now - 5 * 60 * 60 * 1000, now), false);
+  assert.equal(isUpdateCheckDue(6, now - 6 * 60 * 60 * 1000, now), true);
+  assert.equal(isUpdateCheckDue(24, now - 23 * 60 * 60 * 1000, now), false);
 });
 
 test("版本清单同时接受简洁版和带 FPK 校验信息的完整版", () => {

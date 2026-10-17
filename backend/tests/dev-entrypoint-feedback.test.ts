@@ -57,8 +57,8 @@ test("生产反向代理为 20MB 单图保留请求封装空间", async () => {
 
 test("生产镜像包含归档资源和 Hermes Skill 下载模板", async () => {
   const [backendDockerfile, appDockerfile] = await Promise.all([
-    readFile("Dockerfile.backend", "utf8"),
-    readFile("Dockerfile.app", "utf8"),
+    readFile("docker/Dockerfile.backend", "utf8"),
+    readFile("docker/Dockerfile.app", "utf8"),
   ]);
 
   for (const dockerfile of [backendDockerfile, appDockerfile]) {

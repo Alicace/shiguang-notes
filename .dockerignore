@@ -1,5 +1,6 @@
 node_modules
 dist
+.build
 storage
 .git
 .github
@@ -8,3 +9,9 @@ npm-debug.log
 .env
 .env.*
 !.env.example
+.npmrc
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore

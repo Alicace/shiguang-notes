@@ -72,7 +72,7 @@ test("Markdown 兼容性矩阵生成预期语义结构", async () => {
 
 test("项目根目录的 Markdown 全样式模板可完整渲染", async () => {
   const markdown = await readFile(
-    new URL("../../Markdown全样式测试模板.md", import.meta.url),
+    new URL("../../DOCS/fixtures/markdown-full-style-test.md", import.meta.url),
     "utf8",
   );
   const notes = splitSections(markdown);

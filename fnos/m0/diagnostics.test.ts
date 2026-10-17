@@ -11,7 +11,7 @@ test("仅允许固定动作、接口与错误类别，不记录正文路径和�
   const recorder = new DiagnosticRecorder(); recorder.setEnabled(true);
   recorder.action("CANARY_PRIVATE_NOTE"); recorder.api("workspace?token=FAKE_SECRET", "GET", 200, 1);
   recorder.error("CANARY_PRIVATE_USERNAME", "https://private-host.example/main-Ab12.js?token=FAKE_SECRET", 1, 2);
-  recorder.error("Error", "file:///Users/private-user/private-document.md", 1, 2);
+  recorder.error("Error", "file:///Users/example-user/private-document.md", 1, 2);
   const program = { nodeVersion: "22.23.3", uid: 123456, token: "FAKE_SECRET", path: "/vol1/private", username: "CANARY_PRIVATE_USERNAME", systemApiConfigured: true };
   const json = JSON.stringify(recorder.snapshot(program, { T01: "passed", CANARY_PRIVATE_NOTE: "failed" }));
   for (const text of ["FAKE_SECRET", "CANARY_PRIVATE", "private-host", "private-user", "/vol1", "123456"]) assert.ok(!json.includes(text), text);

@@ -1,4 +1,4 @@
-# 可用工具
+# 开发工具与命令
 
 本目录记录智能体和开发者在仓库内可直接使用的工具与命令。执行前先阅读 `DOCS`，执行后运行 feedback 测试。
 
@@ -76,7 +76,7 @@ curl -fsS http://127.0.0.1:18080/api/health
 
 ## 微信公众号富文本与七牛图床
 
-本机仓库与 `/Users/zhaoolee/github/upload-local-image-to-qiniu` 相邻时，
+本机仓库与 `upload-local-image-to-qiniu` 仓库相邻时，
 `npm run dev` 会自动加载仓库根目录的 `.env`；复制 `.env.example` 后填入
 真实配置即可。若 `.env` 没有提供七牛变量，服务仍会读取相邻项目的
 `qiniu.json`。也可以显式指定配置：

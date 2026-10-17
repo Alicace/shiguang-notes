@@ -9,12 +9,11 @@ import { importImageFile } from "../lib/images.js";
 import { HERMES_SKILL_INSTALL_INSTRUCTION_PREVIEW } from "../lib/hermes.js";
 import { THEME_OPTIONS } from "../lib/themes.js";
 import {
-  fetchLatestAppUpdate,
-  isNewerVersion,
   PROJECT_REPOSITORY_URL,
   UPSTREAM_REPOSITORY_URL,
-  type AppUpdate,
-} from "../lib/app-update.js";
+} from "../updates/app-update.js";
+import { useAppUpdate } from "../updates/AppUpdateProvider.js";
+import { UPDATE_INTERVAL_OPTIONS } from "../updates/update-preferences.js";
 import {
   getWechatConnectionStatus,
   getWechatConfiguration,
@@ -28,7 +27,6 @@ import { NativeServiceConfig } from "../native/NativeServiceConfig.js";
 import { SpacesPanel } from "../native/SpacesPanel.js";
 import { FileAccessPanel } from "../native/FileAccessPanel.js";
 import { UserManagement } from "../native/UserManagement.js";
-import { nativeJson, nativeWrite, useNativeSession } from "../native/api.js";
 
 interface SettingsPanelProps {
   onNativeSpaceChange?: (scope: string) => Promise<void>;
@@ -84,22 +82,6 @@ type SettingsCategory = (typeof SETTINGS_CATEGORIES)[number]["id"];
 
 const CHANGELOG_URL = appPath("/changelog");
 
-type UpdateStatus =
-  | "idle"
-  | "checking"
-  | "available"
-  | "current"
-  | "downloading"
-  | "ready"
-  | "error";
-
-interface NativeUpdateResponse {
-  currentVersion: string;
-  hasUpdate: boolean;
-  installable: boolean;
-  latest: AppUpdate;
-}
-
 export function SettingsPanel({
   onNativeSpaceChange = async () => {},
   aiAvailable = false,
@@ -133,7 +115,7 @@ export function SettingsPanel({
   onThemeChange,
   onWorkspaceArchiveExport = () => undefined,
 }: SettingsPanelProps) {
-  const nativeSession = useNativeSession();
+  const appUpdate = useAppUpdate();
   const [category, setCategory] = useState<SettingsCategory>("general");
   const [isFooterLogoUploading, setIsFooterLogoUploading] = useState(false);
   const [footerLogoError, setFooterLogoError] = useState("");
@@ -149,12 +131,7 @@ export function SettingsPanel({
   const [wechatConnectionError, setWechatConnectionError] = useState("");
   const [isWechatAppSecretVisible, setIsWechatAppSecretVisible] =
     useState(false);
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
-  const [latestUpdate, setLatestUpdate] = useState<AppUpdate | null>(null);
-  const [updateMessage, setUpdateMessage] = useState("");
-  const [installerPath, setInstallerPath] = useState("");
   const footerLogoInputRef = useRef<HTMLInputElement | null>(null);
-  const updateCheckStartedRef = useRef(false);
   const isDefaultFooterLogo = footerLogoUrl === DEFAULT_FOOTER_LOGO_URL;
   const isDefaultFooter =
     footerBrand === DEFAULT_FOOTER_BRAND &&
@@ -162,80 +139,28 @@ export function SettingsPanel({
     footerVia === DEFAULT_FOOTER_VIA;
   const accountInitial =
     authUsername?.trim().charAt(0).toLocaleUpperCase("zh-CN") || "便";
-
-  async function checkForUpdates(): Promise<void> {
-    if (!appVersion || ["checking", "downloading"].includes(updateStatus)) return;
-    setUpdateStatus("checking");
-    setUpdateMessage("");
-    setInstallerPath("");
-    try {
-      let next: AppUpdate;
-      let newer: boolean;
-      if (isNative) {
-        const response = await nativeJson<NativeUpdateResponse>("/api/fnos/update");
-        next = response.latest;
-        newer = response.hasUpdate;
-      } else {
-        next = await fetchLatestAppUpdate();
-        newer = isNewerVersion(next.version, appVersion);
-      }
-      setLatestUpdate(next);
-      if (newer) {
-        setUpdateStatus("available");
-        setUpdateMessage(`发现新版本 ${next.version}`);
-      } else {
-        setUpdateStatus("current");
-        setUpdateMessage(`已是最新版本 ${appVersion}`);
-      }
-    } catch (error) {
-      setLatestUpdate(null);
-      setUpdateStatus("error");
-      setUpdateMessage(
-        error instanceof Error ? error.message : "检查更新失败，请稍后重试。",
-      );
-    }
-  }
-
-  async function downloadAndInstallUpdate(): Promise<void> {
-    if (!latestUpdate || ["checking", "downloading"].includes(updateStatus)) return;
-    if (!isNative || !nativeSession?.user.isAdmin || !latestUpdate.asset) {
-      window.open(latestUpdate.releaseUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
-    setUpdateStatus("downloading");
-    setUpdateMessage("正在通过加速线路下载并校验安装包…");
-    try {
-      const result = await nativeJson<{ path: string; reused: boolean }>(
-        "/api/fnos/update/download",
-        nativeWrite({}),
-      );
-      setInstallerPath(result.path);
-      setUpdateStatus("ready");
-      setUpdateMessage("安装包已通过 SHA-256 校验，正在打开飞牛安装器…");
-      const { TrimApp } = await import("@trimjs/web-app");
-      const app = new TrimApp();
-      try {
-        await app.openFile(result.path);
-      } catch {
-        await app.openFileManager(result.path).catch(() => undefined);
-        setUpdateMessage(
-          "安装包已下载并校验。请在飞牛应用中心手动选择该 FPK 完成升级。",
-        );
-      }
-    } catch (error) {
-      setUpdateStatus("error");
-      setUpdateMessage(
-        error instanceof Error ? error.message : "安装包下载失败，请稍后重试。",
-      );
-    }
-  }
-
-  useEffect(() => {
-    if (updateCheckStartedRef.current || !appVersion) return;
-    updateCheckStartedRef.current = true;
-    void checkForUpdates();
-    // appVersion 是本次安装的固定版本号；只在设置面板首次打开时自动检查一次。
-  }, [appVersion]);
+  const updateBusy = [
+    "checking",
+    "downloading",
+    "installing",
+    "waiting-restart",
+  ].includes(appUpdate.status);
+  const updateProgressPercent = Math.max(
+    0,
+    Math.min(100, appUpdate.progress?.percent || 0),
+  );
+  const updateIntervalLabel =
+    UPDATE_INTERVAL_OPTIONS.find(
+      (option) => option.value === appUpdate.intervalHours,
+    )?.label || "每 6 小时";
+  const lastCheckedLabel = appUpdate.lastCheckedAt
+    ? new Date(appUpdate.lastCheckedAt).toLocaleString("zh-CN", {
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "尚未检查";
 
   useEffect(() => {
     let cancelled = false;
@@ -1058,53 +983,131 @@ export function SettingsPanel({
                     </span>
                     <span className="settings-row-value settings-version-value">
                       {appVersion}
-                      {updateStatus === "available" && latestUpdate ? (
+                      {appUpdate.status === "available" &&
+                      appUpdate.latestUpdate ? (
                         <span className="settings-version-badge">
-                          {latestUpdate.version}
+                          {appUpdate.latestUpdate.version}
                         </span>
                       ) : null}
                     </span>
                   </div>
                   <div className="settings-update-summary">
                     <span
-                      className={`settings-update-status is-${updateStatus}`}
+                      className={`settings-update-status is-${appUpdate.status}`}
                       role="status"
                     >
-                      {updateStatus === "checking"
-                        ? "正在检查版本清单…"
-                        : updateStatus === "downloading"
-                          ? "正在下载并校验…"
-                          : updateMessage || "打开设置时自动检查新版本"}
+                      {appUpdate.message ||
+                        `启动应用时自动检查 · ${updateIntervalLabel}`}
                     </span>
-                    {latestUpdate?.publishedAt ? (
-                      <small>发布日期：{latestUpdate.publishedAt.slice(0, 10)}</small>
-                    ) : null}
+                    <small>
+                      最近检查：{lastCheckedLabel}
+                      {appUpdate.latestUpdate?.publishedAt
+                        ? ` · 发布日期：${appUpdate.latestUpdate.publishedAt.slice(0, 10)}`
+                        : ""}
+                    </small>
                   </div>
+                  <label className="settings-update-interval">
+                    <span>自动检查间隔</span>
+                    <select
+                      aria-label="更新检查间隔"
+                      value={appUpdate.intervalHours}
+                      onChange={(event) =>
+                        appUpdate.setIntervalHours(
+                          Number(event.target.value) as typeof appUpdate.intervalHours,
+                        )
+                      }
+                    >
+                      {UPDATE_INTERVAL_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {["downloading", "installing", "waiting-restart"].includes(
+                    appUpdate.status,
+                  ) ? (
+                    <div className="settings-update-progress" aria-live="polite">
+                      <div
+                        className="settings-update-progress-track"
+                        role="progressbar"
+                        aria-label="更新下载进度"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={updateProgressPercent}
+                      >
+                        <span style={{ width: `${updateProgressPercent}%` }} />
+                      </div>
+                      <small>
+                        {updateProgressPercent}% ·{" "}
+                        {appUpdate.progress?.source || "正在选择线路"}
+                        {appUpdate.progress?.speedBytesPerSecond
+                          ? ` · ${Math.round(appUpdate.progress.speedBytesPerSecond / 1024)} KB/s`
+                          : ""}
+                      </small>
+                    </div>
+                  ) : null}
+                  {appUpdate.latestUpdate?.releaseNotes ? (
+                    <details className="settings-update-release-notes">
+                      <summary>查看更新内容</summary>
+                      <p>{appUpdate.latestUpdate.releaseNotes}</p>
+                      <a
+                        href={appUpdate.latestUpdate.releaseUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        完整发布页面
+                      </a>
+                    </details>
+                  ) : null}
                   <div className="settings-update-actions">
                     <button
                       type="button"
                       className="settings-update-check"
-                      disabled={["checking", "downloading"].includes(updateStatus)}
-                      onClick={() => void checkForUpdates()}
+                      disabled={updateBusy}
+                      onClick={() => void appUpdate.checkForUpdates(true)}
                     >
-                      {updateStatus === "checking" ? "检查中…" : "检查更新"}
+                      {appUpdate.status === "checking" ? "检查中…" : "检查更新"}
                     </button>
-                    {["available", "ready"].includes(updateStatus) && latestUpdate ? (
-                      <button
-                        type="button"
-                        className="settings-update-install"
-                        disabled={updateStatus === "downloading"}
-                        onClick={() => void downloadAndInstallUpdate()}
-                      >
-                        {updateStatus === "ready"
-                          ? "重新打开安装器"
-                          : isNative && nativeSession?.user.isAdmin
-                            ? `升级到 ${latestUpdate.version}`
-                            : `查看 ${latestUpdate.version} 新版本`}
-                      </button>
+                    {appUpdate.latestUpdate &&
+                    appUpdate.status !== "current" ? (
+                      appUpdate.installerPath &&
+                      appUpdate.status === "ready" ? (
+                        <button
+                          type="button"
+                          className="settings-update-install"
+                          onClick={() => void appUpdate.openInstaller()}
+                        >
+                          重新打开安装器
+                        </button>
+                      ) : isNative && appUpdate.isAdmin ? (
+                        <button
+                          type="button"
+                          className="settings-update-install"
+                          disabled={updateBusy}
+                          onClick={() =>
+                            void appUpdate.downloadAndInstallUpdate()
+                          }
+                        >
+                          {appUpdate.status === "error"
+                            ? "重新下载"
+                            : updateBusy
+                              ? "正在更新…"
+                              : `下载并更新到 ${appUpdate.latestUpdate.version}`}
+                        </button>
+                      ) : (
+                        <a
+                          className="settings-update-release-link"
+                          href={appUpdate.latestUpdate.releaseUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          查看 {appUpdate.latestUpdate.version} 新版本
+                        </a>
+                      )
                     ) : null}
                   </div>
-                  {installerPath ? (
+                  {appUpdate.installerPath ? (
                     <p className="settings-update-note">
                       安装包已保存在 NAS 应用数据目录并通过完整性校验。
                     </p>

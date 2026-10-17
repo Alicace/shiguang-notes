@@ -17,9 +17,13 @@ import {
 } from "./auth.js";
 import http from "node:http";
 import { createNoteDocument } from "../src/lib/notes.js";
-import { isNewerVersion } from "../src/lib/app-update.js";
+import { isNewerVersion } from "../src/updates/app-update.js";
 import { checkAiAvailability } from "./ai.js";
-import { downloadNativeUpdate, fetchLatestUpdate } from "./native-update.js";
+import {
+  downloadNativeUpdate,
+  fetchLatestUpdate,
+  type UpdateDownloadProgress,
+} from "./updates/native-update.js";
 import metadata from "../src/native/metadata.json" with { type: "json" };
 
 export const nativeMode = process.env.FNOS_NATIVE === "1";
@@ -267,7 +271,7 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
     response.status(removed ? 200 : 403).json(removed ? { ok: true } : { error: "只有空间所有者能删除共享空间。" });
   });
   app.get("/api/program-info", async (_request, response) => response.json({ appVersion: nativeVersion, stage: "完整适配开发版", nodeVersion: process.versions.node, simulation: process.env.FNOS_SIMULATION === "1", systemApiConfigured: Boolean(await systemApiToken()) }));
-  app.get("/api/fnos/update", async (_request, response) => {
+  app.get("/api/fnos/update", async (request, response) => {
     if (process.env.FNOS_SIMULATION === "1" && !process.env.SHIGUANG_UPDATE_MANIFEST_URLS) {
       response.json({
         currentVersion: nativeVersion,
@@ -284,7 +288,7 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
       return;
     }
     try {
-      const latest = await fetchLatestUpdate();
+      const latest = await fetchLatestUpdate(request.query.force === "1");
       response.json({
         currentVersion: nativeVersion,
         latest,
@@ -297,25 +301,101 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
       });
     }
   });
+
+  type UpdateJob = {
+    createdAt: number;
+    error?: string;
+    ownerId: string;
+    path?: string;
+    progress: UpdateDownloadProgress;
+    repeated: boolean;
+    source?: string;
+    status: "queued" | "downloading" | "ready" | "error";
+    version: string;
+  };
+  const updateJobs = new Map<string, UpdateJob>();
+  const pruneUpdateJobs = () => {
+    const cutoff = Date.now() - 30 * 60 * 1000;
+    for (const [id, job] of updateJobs) {
+      if (job.createdAt < cutoff) updateJobs.delete(id);
+    }
+  };
+
   app.post("/api/fnos/update/download", async (_request, response) => {
     if (!requireNativeAdmin(response)) return;
     try {
-      const latest = await fetchLatestUpdate();
+      const latest = await fetchLatestUpdate(true);
       if (!isNewerVersion(latest.version, nativeVersion)) {
         response.status(409).json({ error: "当前已经是最新版本。" });
         return;
       }
-      const update = await downloadNativeUpdate(
+      const existing = [...updateJobs.entries()].find(([, job]) =>
+        job.ownerId === nativeContext.getStore()!.user.id &&
+        job.version === latest.version &&
+        ["queued", "downloading"].includes(job.status)
+      );
+      if (existing) {
+        response.status(202).json({ jobId: existing[0], version: latest.version });
+        return;
+      }
+      const id = randomBytes(12).toString("hex");
+      const job: UpdateJob = {
+        createdAt: Date.now(),
+        ownerId: nativeContext.getStore()!.user.id,
+        progress: {
+          percent: 0,
+          receivedBytes: 0,
+          source: "",
+          speedBytesPerSecond: 0,
+          stage: "connecting",
+          totalBytes: latest.asset?.size || 0,
+        },
+        repeated: false,
+        status: "queued",
+        version: latest.version,
+      };
+      updateJobs.set(id, job);
+      pruneUpdateJobs();
+      response.status(202).json({ jobId: id, version: latest.version });
+      void downloadNativeUpdate(
         latest,
         process.env.TRIM_PKGVAR!,
         nativeVersion,
-      );
-      response.json({ ...update, version: latest.version });
+        (progress) => {
+          job.status = "downloading";
+          job.progress = progress;
+        },
+      ).then((result) => {
+        job.path = result.path;
+        job.repeated = result.reused;
+        job.source = result.source;
+        job.status = "ready";
+      }).catch((error) => {
+        job.error = error instanceof Error ? error.message : "安装包下载失败。";
+        job.status = "error";
+      });
     } catch (error) {
       response.status(502).json({
         error: error instanceof Error ? error.message : "安装包下载失败。",
       });
     }
+  });
+  app.get("/api/fnos/update/download/:id", (request, response) => {
+    if (!requireNativeAdmin(response)) return;
+    const job = updateJobs.get(request.params.id);
+    if (!job || job.ownerId !== nativeContext.getStore()!.user.id) {
+      response.status(404).json({ error: "下载任务不存在或已过期。" });
+      return;
+    }
+    response.json({
+      error: job.error,
+      path: job.path,
+      progress: job.progress,
+      repeated: job.repeated,
+      source: job.source,
+      status: job.status,
+      version: job.version,
+    });
   });
   app.get("/api/session", async (_request, response) => { const ctx = nativeContext.getStore()!; response.json({ user: { uid: ctx.uid, username: ctx.user.username, isAdmin: ctx.isAdmin }, simulation: process.env.FNOS_SIMULATION === "1", systemApiConfigured: Boolean(await systemApiToken()) }); });
   // 没有系统凭据时不能装作成功：明确告诉前端「未就绪」，界面据此给出可操作的提示。
@@ -344,10 +424,21 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
   // 刷新或切换工作区后就会变空。这里把用户确认过的路径落盘，两个来源取并集，
   // 保证「刷新授权状态」和「共享空间返回」都不会把已授权目录弄丢。
   const authorizedFolderFile = () => spaces.sibling("authorized-folders.json");
+  let authorizedFolderQueue: Promise<void> = Promise.resolve();
   const readAuthorizedFolders = async (): Promise<Record<string, string[]>> => {
     try {
       const parsed = JSON.parse(await fs.readFile(authorizedFolderFile(), "utf8"));
-      return parsed && typeof parsed === "object" ? parsed : {};
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+      const result: Record<string, string[]> = {};
+      for (const [key, paths] of Object.entries(parsed)) {
+        if (
+          Array.isArray(paths) &&
+          paths.every((item) => typeof item === "string")
+        ) {
+          result[key] = paths;
+        }
+      }
+      return result;
     } catch { return {}; }
   };
   const writeAuthorizedFolders = async (value: Record<string, string[]>): Promise<void> => {
@@ -356,6 +447,19 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
     await fs.mkdir(path.dirname(filename), { recursive: true, mode: 0o700 });
     try { await fs.writeFile(temporary, JSON.stringify(value), { mode: 0o600, flag: "wx" }); await fs.rename(temporary, filename); }
     finally { await fs.rm(temporary, { force: true }); }
+  };
+  const updateAuthorizedFolders = <T>(operation: (value: Record<string, string[]>) => T): Promise<T> => {
+    const result = authorizedFolderQueue.then(async () => {
+      const value = await readAuthorizedFolders();
+      const output = operation(value);
+      await writeAuthorizedFolders(value);
+      return output;
+    });
+    authorizedFolderQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   };
   const configuredFileRoots = (process.env.FNOS_ALLOWED_FILE_ROOTS || "")
     .split(path.delimiter)
@@ -371,15 +475,7 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
     return /^\/(?:vol\d+|share)(?:\/|$)/.test(value);
   };
 
-  const loadLiveAuthorizedFolders = async (): Promise<string[]> => {
-    if (!(await systemApiToken())) return [];
-    try {
-      const value = await systemApi("trim.file.getUserAccessibleFolders", { uid: nativeContext.getStore()!.uid });
-      return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.startsWith("/")) : [];
-    } catch { return []; }
-  };
-
-  const normalizeHostSelectedPath = async (value: string): Promise<string | null> => {
+  const normalizeAuthorizedPath = async (value: string): Promise<string | null> => {
     if (!value.startsWith("/") || value.includes("\0") || value.length > 4096) return null;
     try {
       const real = await fs.realpath(path.resolve(value));
@@ -390,12 +486,33 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
       return null;
     }
   };
+  const loadLiveAuthorizedFolders = async (): Promise<string[]> => {
+    if (!(await systemApiToken())) return [];
+    try {
+      const value = await systemApi("trim.file.getUserAccessibleFolders", { uid: nativeContext.getStore()!.uid });
+      return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.startsWith("/")) : [];
+    } catch { return []; }
+  };
+  const loadAuthorizedRoots = async (userId: string): Promise<string[]> => {
+    const remembered = (await readAuthorizedFolders())[userId] || [];
+    const normalizedRemembered = (await Promise.all(remembered.map(normalizeAuthorizedPath)))
+      .filter((item): item is string => Boolean(item));
+    // Once the host API is available, its ACL is authoritative. A stale
+    // remembered path must not keep working after the user loses access.
+    return (await systemApiToken()) ? loadLiveAuthorizedFolders() : normalizedRemembered;
+  };
+  const isPathInside = (root: string, candidate: string): boolean => {
+    const relative = path.relative(root, candidate);
+    return relative === "" ||
+      (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+  };
 
   app.get("/api/authorized-folders", async (_request, response) => {
     const userId = nativeContext.getStore()!.user.id;
-    const remembered = (await readAuthorizedFolders())[userId] || [];
-    const live = await loadLiveAuthorizedFolders();
-    response.json({ configured: Boolean(await systemApiToken()), paths: Array.from(new Set([...remembered, ...live])) });
+    response.json({
+      configured: Boolean(await systemApiToken()),
+      paths: await loadAuthorizedRoots(userId),
+    });
   });
 
   // 记录本次宿主选择器确认过的目录；系统 API 可用时再按实时授权列表复核。
@@ -405,20 +522,17 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
     const candidates = Array.isArray(input)
       ? input.filter((item: unknown): item is string => typeof item === "string" && item.startsWith("/") && !item.includes("\0") && item.length <= 4096).slice(0, 64)
       : [];
-    const live = await loadLiveAuthorizedFolders();
-    const verified = live.length
-      ? candidates.filter((candidate) => live.some((folder) => candidate === folder || candidate.startsWith(folder.endsWith("/") ? folder : folder + "/")))
-      : [];
-    // 旧版 Desktop 拿不到系统 API 凭据时，宿主选择器仍已完成授权。
-    // 只接受用户卷/共享卷中真实存在的路径，并拒绝路径穿越和伪协议。
-    const hostSelected = request.get("x-fnnotes-host-picker") === "1"
-      ? (await Promise.all(candidates.map(normalizeHostSelectedPath))).filter((item): item is string => Boolean(item))
-      : [];
-    const valid = Array.from(new Set([...verified, ...hostSelected]));
-    const store_ = await readAuthorizedFolders();
-    store_[userId] = Array.from(new Set([...(store_[userId] || []), ...valid]));
-    await writeAuthorizedFolders(store_);
-    response.json({ paths: store_[userId] });
+    const live = (await Promise.all(
+      (await loadLiveAuthorizedFolders()).map(normalizeAuthorizedPath),
+    )).filter((item): item is string => Boolean(item));
+    const verified = (await Promise.all(candidates.map(normalizeAuthorizedPath)))
+      .filter((item): item is string => Boolean(item))
+      .filter((candidate) => live.some((folder) => isPathInside(folder, candidate)));
+    const paths = await updateAuthorizedFolders((store_) => {
+      store_[userId] = Array.from(new Set([...(store_[userId] || []), ...verified]));
+      return store_[userId];
+    });
+    response.json({ paths });
   });
   // 读取 NAS 上已授权目录里的图片：只允许用户已授权目录下的图片文件，
   // 单个文件有上限，避免把应用当成任意文件读取器。
@@ -430,9 +544,7 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
     }
 
     const userId = nativeContext.getStore()!.user.id;
-    const remembered = (await readAuthorizedFolders())[userId] || [];
-    const live = await loadLiveAuthorizedFolders();
-    const allowedRoots = Array.from(new Set([...remembered, ...live]));
+    const allowedRoots = await loadAuthorizedRoots(userId);
     let requestedPath: string;
     try { requestedPath = await fs.realpath(path.resolve(value)); }
     catch { response.status(404).json({ error: "图片文件不存在或无法读取。" }); return; }
@@ -449,6 +561,37 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
     }
 
     try {
+      if (await systemApiToken()) {
+        let permissions: unknown;
+        try {
+          permissions = await systemApi("trim.file.checkUserACL", {
+            uid: nativeContext.getStore()!.uid,
+            path: requestedPath,
+          });
+        } catch {
+          response.status(503).json({ error: "飞牛文件 ACL 检查暂不可用，请稍后重试。" });
+          return;
+        }
+        const permissionList = Array.isArray(permissions)
+          ? permissions
+          : permissions && typeof permissions === "object"
+            ? (permissions as { permissions?: unknown }).permissions
+            : null;
+        const readable =
+          (Array.isArray(permissionList) &&
+            permissionList.some(
+              (item) => item && typeof item === "object" &&
+                (item as { readable?: unknown }).readable === true,
+            )) ||
+          Boolean(
+              permissions && typeof permissions === "object" &&
+                (permissions as { readable?: unknown }).readable === true,
+          );
+        if (!readable) {
+          response.status(403).json({ error: "当前用户没有读取该文件的权限。" });
+          return;
+        }
+      }
       const stat = await fs.stat(requestedPath);
       if (!stat.isFile() || stat.size > 32 * 1024 * 1024) {
         response.status(400).json({ error: "只能读取 32MB 以内的图片文件。" });

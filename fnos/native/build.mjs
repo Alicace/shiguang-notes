@@ -6,17 +6,22 @@ import sharp from "sharp";
 import { prepareProductionRuntime } from "./package-files.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const packageDir = path.join(root, "fnnotes-m0");
+const templateDir = path.join(root, "fnos/native/package-template");
+const packageDir = path.join(root, ".build/fnnotes-m0");
 const app = path.join(packageDir, "app");
 const nativeDist = path.join(root, "dist-fnos");
 const metadata = JSON.parse(readFileSync(path.join(root, "src/native/metadata.json")));
 function run(command, args, env = process.env) { const result = spawnSync(command, args, { cwd: root, env, stdio: "inherit" }); if (result.error || result.status !== 0) throw result.error || new Error("原生构建失败。"); }
 run(process.execPath, ["node_modules/typescript/bin/tsc", "--noEmit", "-p", "tsconfig.json"]);
+rmSync(path.join(root, "dist-server"), { recursive: true, force: true });
 run(process.execPath, ["node_modules/typescript/bin/tsc", "-p", "tsconfig.server.json"]);
 run(process.execPath, ["node_modules/vite/bin/vite.js", "build", "--outDir", "dist-fnos"], { ...process.env, VITE_FNOS_NATIVE: "1" });
 cpSync(path.join(nativeDist, "fnos/m0/ui/auth-callback.html"), path.join(nativeDist, "auth-callback.html"));
-for (const folder of ["web", "server", "dist", "dist-server", "node_modules", "public", "src", "skills"]) rmSync(path.join(app, folder), { recursive: true, force: true });
+rmSync(packageDir, { recursive: true, force: true });
+mkdirSync(path.dirname(packageDir), { recursive: true });
+cpSync(templateDir, packageDir, { recursive: true });
 mkdirSync(path.join(app, "server"), { recursive: true });
+mkdirSync(path.join(app, "ui/images"), { recursive: true });
 cpSync(path.join(root, "fnos/native/main.mjs"), path.join(app, "server/main.mjs"));
 cpSync(nativeDist, path.join(app, "dist"), { recursive: true });
 for (const folder of ["dist-server", "public", "src/assets/fonts", "skills/notes-workspace-api", "skills/notes-export-api"]) cpSync(path.join(root, folder), path.join(app, folder), { recursive: true });
@@ -38,6 +43,6 @@ manifest = manifest.replace(/^version\s*=.*$/m, "version=" + metadata.appVersion
 writeFileSync(path.join(packageDir, "manifest"), manifest);
 writeFileSync(path.join(app, "build-info.json"), JSON.stringify({ ...metadata, png: "client", nasVerified: false }, null, 2));
 writeFileSync(path.join(app, "package.json"), JSON.stringify({ type: "module", private: true, version: metadata.appVersion }));
-function clean(dir) { for (const item of readdirSync(dir, { withFileTypes: true })) { const target = path.join(dir, item.name); if (item.name === ".DS_Store") rmSync(target); else if (item.isSymbolicLink()) throw new Error("打包目录包含不支持的软链接：" + path.relative(packageDir, target)); else if (item.isDirectory()) clean(target); } }
+function clean(dir) { for (const item of readdirSync(dir, { withFileTypes: true })) { const target = path.join(dir, item.name); if (item.name === ".DS_Store" || item.name === ".env" || (item.name.startsWith(".env.") && item.name !== ".env.example") || item.name === ".npmrc") rmSync(target); else if (item.isSymbolicLink()) throw new Error("打包目录包含不支持的软链接：" + path.relative(packageDir, target)); else if (item.isDirectory()) clean(target); } }
 clean(packageDir);
 if (process.argv.includes("--pack")) run(process.env.FN_PACK_BIN || path.resolve(root, "../.tools/fnpack-1.2.3-darwin-arm64"), ["build", "--directory", packageDir]);

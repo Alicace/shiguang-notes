@@ -32,9 +32,6 @@
     "test:dsh-plugin": "node --import tsx --test --test-concurrency=1 dsh-plugin/tests/*.test.ts",
     "benchmark:input": "node scripts/benchmark-input-latency.mjs",
     "preview": "vite preview",
-    "fnos:m0:build": "node fnos/m0/build.mjs",
-    "fnos:m0:pack": "node fnos/m0/build.mjs --pack",
-    "fnos:m0:dev": "node fnos/m0/dev.mjs",
     "fnos:build": "node fnos/native/build.mjs",
     "fnos:pack": "node fnos/native/build.mjs --pack",
     "fnos:manifest": "node scripts/make-update-manifest.mjs",
@@ -69,7 +66,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.0",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.2",
     "vite": "^7.1.2"
   }

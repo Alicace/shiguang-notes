@@ -46,9 +46,9 @@ GitHub 临时下载。恢复包至少包含：
 
 - `git archive <commit>` 生成的完整已跟踪源码快照；
 - `package.json`、`package-lock.json`、TypeScript/Vite 配置；
-- `Dockerfile*`、`docker-compose*.yml`、`docker/`；
+- `docker/Dockerfile*`、`docker-compose*.yml`、`docker/`；
 - `src/`、`server/`、`public/`、`example/`、`scripts/` 和 `skills/`；
-- `frontend/tests/`、`backend/tests/`、`DOCS/`、`PROMPTS/`、`TOOLS/`；
+- `frontend/tests/`、`backend/tests/`、`DOCS/` 与 `scripts/tools/`；
 - 发布 commit、tag、构建时间、Node/Playwright 基础镜像和最终镜像 digest；
 - `npm test` 与 `npm run build` 的结果摘要；
 - 一份不依赖线上站点的恢复操作手册。

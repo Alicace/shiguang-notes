@@ -18,7 +18,10 @@
 
 ```text
 src/                     前端源码与前后端共享渲染组件
+src/updates/             版本检查、更新提示与下载进度
 server/                  Express API 与 Playwright 导出服务
+server/security/         登录节流与安全远端图片读取
+server/updates/          更新清单、镜像测速、FPK 下载与校验
 frontend/tests/          前端 feedback 测试及渲染样例
 backend/tests/           后端 feedback 测试
 public/                  前端静态资源
@@ -26,9 +29,10 @@ storage/images/          导入图片与导出 PNG 的持久化目录
 storage/data/            账号、云端工作区与匿名额度的服务端持久化目录
 skills/notes-export-api/ 长图导出与登录工作区管理 API Skill
 skills/notes-workspace-api/ Hermes 云端工作区管理 Skill 与下载模板
-DOCS/                    项目上下文
-TOOLS/                   可用工具与命令
-PROMPTS/                 固定工作流 Prompt
+DOCS/                    项目上下文、开发文档与固定测试样例
+DOCS/development/        开发工具、发布流程与固定工作流
+DOCS/fixtures/           Markdown 等反馈测试固定样例
+scripts/tools/           可重复执行的资源维护脚本
 MEMORY/                  经测试确认的长期事实
 ```
 
@@ -490,7 +494,7 @@ PNG 导出、离线归档和公众号复制共同复用。顶层图片装裱容�
 `storage/data` 中原子计数，并在北京时间 0 点切换日期键；匿名对象使用
 `<QINIU_PREFIX>/temporary/<北京时间日期>/` 前缀，上传凭证写入
 `deleteAfterDays: 1`。超额返回 HTTP 429，并提示联系
-`zhaoolee@gmail.com` 注册。额度可用 `ANONYMOUS_DAILY_UPLOAD_LIMIT` 调整。
+部署管理员注册。额度可用 `ANONYMOUS_DAILY_UPLOAD_LIMIT` 调整。
 
 七牛配置按以下顺序读取：
 
@@ -541,7 +545,7 @@ DeepSeek 当前默认选择 `deepseek-v4-flash` 并关闭 thinking。AI 消耗�
 
 - 开发双容器：`docker-compose.dev.yml`，Vite HMR 与 `tsx watch`
 - 生产双容器：`docker-compose.yml`，Nginx 前端与 Playwright 后端
-- 生产单镜像：`Dockerfile.app`，Express 同时托管 `dist`、API 和图片
+- 生产单镜像：`docker/Dockerfile.app`，Express 同时托管 `dist`、API 和图片
 - Docker Hub 发布：`.github/workflows/docker-publish.yml`
 
 账号与同步数据默认位于 `storage/data/notes-data.json`。Compose 已把
@@ -549,4 +553,4 @@ DeepSeek 当前默认选择 `deepseek-v4-flash` 并关闭 thinking。AI 消耗�
 存储。当前文件存储通过单进程队列和原子重命名保证一致性，因此生产环境应保持
 单个后端写入实例；若要水平扩容，应先迁移到支持事务和唯一约束的数据库。
 
-具体发布流程见 `PROMPTS/deploy-to-production.md`。
+具体发布流程见 `DOCS/development/deploy-to-production.md`。

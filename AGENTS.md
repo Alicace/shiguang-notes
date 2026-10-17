@@ -25,13 +25,13 @@
 
 ### 4. 可用的工具
 
-存储在项目根目录下文件夹：TOOLS
+存储在项目根目录下文件：DOCS/development/tools.md
 
 ### 5. 固定流程的prompts（支持skill）
 
-存储在项目根目录下文件夹：PROMPTS
+存储在项目根目录下文件夹：DOCS/development
 
-比如部署到生产可用 PROMPTS/deploy-to-production.md
+比如部署到生产可用 DOCS/development/deploy-to-production.md
 
 ### 6. MEMORY
 
@@ -42,4 +42,4 @@
 收到prompt后，阅读**DOCS**，生成执行任务，完成后，跑**feedback测试**，测试完成后，有价值的信息更新到**MEMORY**
 
 任何用户可感知的功能、行为、兼容性或安全性变化，都必须同步维护项目根目录的
-`CHANGELOG.md`；具体格式与发布归档规则见 `PROMPTS/deploy-to-production.md`。
+`CHANGELOG.md`；具体格式与发布归档规则见 `DOCS/development/deploy-to-production.md`。

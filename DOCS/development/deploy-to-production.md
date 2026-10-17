@@ -1,6 +1,6 @@
 # 部署到生产
 
-生产环境固定使用源码 `docker compose` 部署，主机为 `hermes-v2fy`。
+上游 Docker/Web 版本使用源码 `docker compose` 部署。部署主机名、账号和密钥属于本地环境信息，不应写入仓库。飞牛原生 FPK 的发布流程见仓库根目录 `README.md` 和 GitHub Release 工作流。
 
 
 ## 更新日志规范
@@ -66,7 +66,7 @@ git rev-parse HEAD
 进入生产仓库；首次部署时才执行 clone：
 
 ```bash
-ssh hermes-v2fy
+ssh <deployment-host>
 cd ~/github
 test -d notes/.git || git clone https://github.com/zhaoolee/notes
 cd notes

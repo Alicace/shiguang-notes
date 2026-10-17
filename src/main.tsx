@@ -7,9 +7,15 @@ import { PromoStudioPage } from "./components/PromoStudioPage";
 import { SuperAdminPage } from "./components/SuperAdminPage";
 import { installAutoHideScrollbars } from "./lib/auto-hide-scrollbars";
 import { getPageTitle } from "./lib/page-title";
+import nativeMetadata from "./native/metadata.json";
 import "./styles.css";
 import { isNative, nativeBase } from "./lib/fnos-client";
 import "./native/styles.css";
+import {
+  AppUpdateProvider,
+} from "./updates/AppUpdateProvider";
+import { AppUpdatePrompt } from "./updates/AppUpdatePrompt";
+import "./updates/update.css";
 
 document.title = isNative ? "拾光便签" : getPageTitle(window.location.hostname);
 installAutoHideScrollbars();
@@ -29,5 +35,10 @@ const rootPage =
   );
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>{rootPage}</StrictMode>,
+  <StrictMode>
+    <AppUpdateProvider appVersion={isNative ? nativeMetadata.appVersion : ""}>
+      {rootPage}
+      {isNative ? <AppUpdatePrompt /> : null}
+    </AppUpdateProvider>
+  </StrictMode>,
 );

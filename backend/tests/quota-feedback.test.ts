@@ -40,7 +40,8 @@ test("匿名图片额度按北京时间零点以 500 张全局重置", async (co
     (error: unknown) => {
       assert.ok(error instanceof AnonymousQuotaExceededError);
       assert.equal(error.quota.used, 500);
-      assert.match(error.message, /zhaoolee@gmail\.com/);
+      assert.match(error.message, /部署管理员/);
+      assert.doesNotMatch(error.message, /@/);
       return true;
     },
   );

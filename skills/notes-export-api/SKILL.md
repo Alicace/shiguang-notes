@@ -26,7 +26,7 @@ NOTES_API_TOKEN=notes_sk_v1.xxx
 密码。Token 已存在时不再读取账号密码。
 
 如果服务部署在局域网主机或自有域名下，可改为实际地址，例如
-`http://192.168.1.20:18080` 或 `https://notes.example.com`。
+`http://192.0.2.20:18080` 或 `https://notes.example.com`。
 
 单人部署时，把项目根目录 `.env` 中 `SUPERADMIN` 和 `SUPERADMINPASSWORD` 的实际值
 分别复制到 `NOTES_API_USERNAME` 和 `NOTES_API_PASSWORD`；不要写成变量引用。

@@ -10,7 +10,7 @@ const benchmarkSource = readFileSync(
   "scripts/benchmark-input-latency.mjs",
   "utf8",
 );
-const toolsDocumentation = readFileSync("TOOLS/README.md", "utf8");
+const toolsDocumentation = readFileSync("DOCS/development/tools.md", "utf8");
 
 test("正文输入延迟 benchmark 提供稳定的项目命令和测量口径", () => {
   assert.equal(

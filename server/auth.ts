@@ -177,7 +177,7 @@ export class AnonymousQuotaExceededError extends Error {
 
   constructor(quota: AnonymousQuotaStatus) {
     super(
-      `今日匿名图片额度（${quota.limit} 张）已用完，将于北京时间 0 点重置。请联系管理员 zhaoolee@gmail.com 注册账号。`,
+      `今日匿名图片额度（${quota.limit} 张）已用完，将于北京时间 0 点重置。请联系部署管理员注册账号。`,
     );
     this.name = "AnonymousQuotaExceededError";
     this.quota = quota;
@@ -731,6 +731,7 @@ export class NotesDataStore {
       if (disabled) {
         account.passwordVersion += 1;
         account.skillTokenVersion += 1;
+        delete database.hermesInstallLinks[userId];
       }
 
       await this.writeDatabase(database);
@@ -899,6 +900,7 @@ export class NotesDataStore {
       account.passwordSalt = password.salt;
       account.passwordVersion += 1;
       account.skillTokenVersion += 1;
+      delete database.hermesInstallLinks[userId];
       await this.writeDatabase(database);
       return account.passwordVersion;
     });
@@ -968,6 +970,7 @@ export class NotesDataStore {
       account.passwordSalt = password.salt;
       account.passwordVersion += 1;
       account.skillTokenVersion += 1;
+      delete database.hermesInstallLinks[userId];
       await this.writeDatabase(database);
       return account.passwordVersion;
     });
@@ -988,6 +991,7 @@ export class NotesDataStore {
       account.passwordSalt = password.salt;
       account.passwordVersion += 1;
       account.skillTokenVersion += 1;
+      delete database.hermesInstallLinks[userId];
       await this.writeDatabase(database);
 
       return {

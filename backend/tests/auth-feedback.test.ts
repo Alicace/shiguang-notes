@@ -282,6 +282,8 @@ test("管理员可使用便签服务、创建用户且各账号云工作区严�
       cwd: process.cwd(),
       env: {
         ...process.env,
+      NODE_ENV: "test",
+      SHIGUANG_TEST_IMAGE_HOST: `127.0.0.1:${wechatPort}`,
         DATA_STORAGE_DIR: dataDir,
         IMAGE_STORAGE_DIR: imageDir,
         AppID: "wxaaaaaaaaaaaaaaaa",
@@ -1102,6 +1104,29 @@ test("管理员可使用便签服务、创建用户且各账号云工作区严�
     assert.match(databaseText, /alice-private/);
     assert.match(databaseText, /bob-private/);
     assert.match(databaseText, /admin-private/);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const failedAdminLogin = await postJson(
+        baseUrl,
+        "/api/superadmin/login",
+        {
+          password: "wrong-admin-password",
+          username: "feedback-admin",
+        },
+      );
+      assert.equal(failedAdminLogin.status, 401);
+    }
+
+    const blockedAdminLogin = await postJson(
+      baseUrl,
+      "/api/superadmin/login",
+      {
+        password: "wrong-admin-password",
+        username: "feedback-admin",
+      },
+    );
+    assert.equal(blockedAdminLogin.status, 429);
+    assert.ok(Number(blockedAdminLogin.headers.get("retry-after")) > 0);
   } catch (error) {
     throw new Error(
       [

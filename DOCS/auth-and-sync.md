@@ -181,7 +181,7 @@ Token 失效。
 
 - 默认全站每天 500 张。
 - 日期和重置边界使用 UTC+8，北京时间 0 点自动进入新日期。
-- 超额返回 HTTP 429，提示联系 `zhaoolee@gmail.com` 注册。
+- 超额返回 HTTP 429，提示联系部署管理员注册。
 - 对象前缀为 `<QINIU_PREFIX>/temporary/YYYY-MM-DD/`。
 - 七牛上传策略设置 `deleteAfterDays: 1`，由七牛生命周期自动清理。
 

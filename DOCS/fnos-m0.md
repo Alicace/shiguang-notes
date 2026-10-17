@@ -10,12 +10,12 @@
 
 M0 用独立的 Node 标准库服务验证网关、保存和系统 API，前端复用上游 MarkdownText。它不运行旧的 Express/Playwright 服务。完整应用在后续阶段将这些能力接入现有 React/Express 业务，不重写无关上游代码。
 
-旧 `PROMPTS/deploy-to-production.md` 的 Docker/VPS 部署不适用于本原生项目，不执行其生产主机或推送步骤；沿用更新日志和反馈测试规范。
+旧 `DOCS/development/deploy-to-production.md` 的 Docker/VPS 部署不适用于本原生项目，不执行其生产主机或推送步骤；沿用更新日志和反馈测试规范。
 
 ## 目录
 
 - `fnos/m0/`：服务、开发机模拟网关、前端、测试与构建脚本。
-- `fnnotes-m0/`：原生包元数据、生命周期、配置和向导。
+- `fnos/native/package-template/`：原生包元数据、生命周期、配置和向导模板；构建时复制到被忽略的 `.build/fnnotes-m0/`。
 - `../docs/`：产品与技术文档、M0 安装验收说明。
 - `../release/`：供用户安装的 FPK、校验值和验证记录。
 
@@ -34,13 +34,11 @@ M0 用独立的 Node 标准库服务验证网关、保存和系统 API，前端�
 ```bash
 npm ci
 npm run fnos:m0:test
-npm run fnos:m0:build
-npm run fnos:m0:dev
 ```
 
-构建原生包使用 `npm run fnos:m0:pack`。可通过 `FN_PACK_BIN` 指定官方 fnpack 路径；本机默认位于项目外层 `.tools/`。产物输出为当前源码目录中的 `fnnotes-m0.fpk`，用户交付副本位于外层 `release/`。
+M0 已归档为测试和历史参考，不再提供独立打包/模拟入口；当前完整应用统一使用 `npm run fnos:build`、`npm run fnos:pack` 和 `npm run fnos:dev`。可通过 `FN_PACK_BIN` 指定官方 fnpack 路径；本机默认位于项目外层 `.tools/`。产物输出为当前源码目录中的 `fnnotes-m0.fpk`，用户交付副本位于外层 `release/`。
 
-浏览器验证使用 Playwright CLI 的独立会话，执行 `fnos/m0/browser-check.js`，输出到 `output/playwright/`。不把测试用浏览器带入 FPK，也不关闭用户正常浏览器。
+浏览器验证使用 `fnos/native/*browser-check.js`；M0 的旧浏览器脚本只保留为历史文件，不作为当前验收入口。不把测试用浏览器带入 FPK，也不关闭用户正常浏览器。
 
 PNG 固定导出宽度、像素倍率和分片上限；采用静态捕获根节点，避免复制离屏 CSS 定位造成全透明图像。跨端库支持仍以真实设备结果为准。
 

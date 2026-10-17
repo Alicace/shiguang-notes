@@ -16,9 +16,7 @@ async function callback() {
     if (result.status === "success" && paths.length) {
       await api(
         "authorized-folders",
-        writeOptions(session, { paths }, "POST", {
-          "X-Fnnotes-Host-Picker": "1",
-        }),
+        writeOptions(session, { paths }, "POST"),
       ).catch(() => undefined);
     }
     status.textContent = result.status === "cancel" ? "已取消授权，正在返回。" : "授权回调已校验，正在返回便签。";

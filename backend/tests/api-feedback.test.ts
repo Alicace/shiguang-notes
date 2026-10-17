@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -276,6 +276,17 @@ test("Express 提供健康检查和内容寻址图片存储", async (context) =>
     const imageResponse = await fetch(`${baseUrl}${imported.path}`);
     assert.equal(imageResponse.status, 200);
     assert.deepEqual(Buffer.from(await imageResponse.arrayBuffer()), png);
+    await writeFile(
+      path.join(storageDir, "active-content.svg"),
+      '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+    );
+    const svgResponse = await fetch(`${baseUrl}/images/active-content.svg`);
+    assert.equal(svgResponse.status, 200);
+    assert.equal(svgResponse.headers.get("x-content-type-options"), "nosniff");
+    assert.match(
+      svgResponse.headers.get("content-security-policy") || "",
+      /sandbox;.*default-src 'none'/,
+    );
 
     const themedArchiveResponse = await fetch(`${baseUrl}/api/archive`, {
       method: "POST",

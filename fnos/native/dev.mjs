@@ -10,7 +10,7 @@ const socket = path.join(temporary, "app.sock");
 const simulatedNames = (process.env.FNOS_SIM_USERS || "test-user-1001,test-user-1002,test-user-1003")
   .split(",")
   .map((name) => name.trim());
-Object.assign(process.env, { FNOS_NATIVE: "1", FNOS_SIMULATION: "1", REQUIRE_LOGIN: "true", FNOS_SOCKET: socket, FNOS_WEB_DIR: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../fnnotes-m0/app/dist"), TRIM_PKGVAR: temporary, DATA_STORAGE_DIR: path.join(temporary, "data"), IMAGE_STORAGE_DIR: path.join(temporary, "images") });
+Object.assign(process.env, { FNOS_NATIVE: "1", FNOS_SIMULATION: "1", REQUIRE_LOGIN: "true", FNOS_SOCKET: socket, FNOS_WEB_DIR: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.build/fnnotes-m0/app/dist"), TRIM_PKGVAR: temporary, DATA_STORAGE_DIR: path.join(temporary, "data"), IMAGE_STORAGE_DIR: path.join(temporary, "images") });
 await import("../../dist-server/server/index.js");
 const gateways = [];
 for (const [index, [port, uid, isAdmin]] of [[18338, 1001, false], [18339, 1002, false], [18340, 1003, true]].entries()) {
