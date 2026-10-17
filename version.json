@@ -5,8 +5,8 @@
   "release_notes": "- 修复本地目录授权：宿主选择器返回的目录现在可以保存，并在刷新、重开应用和切换共享空间后恢复。\n- 修复共享空间：创建后自动展开名称和成员管理；成员账号列表支持刷新，也可直接按 NAS UID 邀请。\n- 修复关于页版本检查：兼容不同飞牛宿主返回的目录/清单格式，并增加国内加速线路回退。\n- 更新提示内容精简为关键变更，详细记录仍可在完整发布页查看。\n- 集中修复鉴权、ACL、路径读取、远端图片、导出和安装包校验问题。",
   "asset": {
     "name": "fnnotes-m0_0.9.3_x86_64.fpk",
-    "size": 69405434,
-    "sha256": "a6811f42ac8b441cc6bcd7a7fe16b5357547e8530dff0c60bf77458193ee25d3",
+    "size": 73161750,
+    "sha256": "9ed052a7779e8d12a7521d4b91c897eeb7ce3d9d044296d3674b6b9ba65066a0",
     "urls": [
       "https://github.com/Alicace/shiguang-notes/releases/download/v0.9.3/fnnotes-m0_0.9.3_x86_64.fpk",
       "https://ghfast.top/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.3/fnnotes-m0_0.9.3_x86_64.fpk",
