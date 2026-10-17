@@ -24,7 +24,7 @@ function releaseNoteLines(value: string): string[] {
         .replace(/\*\*/g, "")
         .replace(/`/g, ""),
     )
-    .slice(0, 16);
+    .slice(0, 6);
 }
 
 export function AppUpdatePrompt() {

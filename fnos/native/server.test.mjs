@@ -149,7 +149,7 @@ test("目录授权刷新后从持久化记录恢复，浏览器不能写入任�
   })).status, 403);
 });
 
-test("目录授权只接受系统 API 确认的路径，缺少 Origin 的同源写请求仍由 CSRF 保护", async () => {
+test("宿主选择器在系统 API 未就绪时可登记真实目录，缺少 Origin 的同源写请求仍由 CSRF 保护", async () => {
   const uid = 1011;
   const token = await session(uid);
   const folder = path.join(directory, "picked-folder");
@@ -162,23 +162,19 @@ test("目录授权只接受系统 API 确认的路径，缺少 Origin 的同源�
       "base64",
     ),
   );
-  const realImagePath = await realpath(imagePath);
-  await writeFile(
-    path.join(directory, "data", "authorized-folders.json"),
-    JSON.stringify({ [`nas-${uid}`]: [folder] }),
-    { mode: 0o600 },
-  );
-
   const remembered = await request("/api/authorized-folders", {
     method: "POST",
     token,
     uid,
     body: { paths: [imagePath] },
+    extra: { "X-Fnnotes-Host-Picker": "1" },
     omitOrigin: true,
   });
   assert.equal(remembered.status, 200);
-  assert.deepEqual(remembered.data.paths, [folder]);
-  assert.ok(!remembered.data.paths.includes(realImagePath), JSON.stringify(remembered.data));
+  assert.equal(
+    await realpath(remembered.data.paths[0]),
+    await realpath(imagePath),
+  );
 
   const image = await request("/api/fnos/read-image", {
     method: "POST",
@@ -302,6 +298,17 @@ test("用户管理：只有 NAS 管理员能建号、停用与删除，独立账
   assert.equal(created.status, 201);
   assert.equal(created.data.user.kind, "app");
   assert.ok(created.data.initialPassword.length >= 8);
+  const memberCandidates = await request("/api/fnos/member-candidates");
+  assert.equal(memberCandidates.status, 200);
+  assert.ok(
+    memberCandidates.data.users.some(
+      (item) => item.id === created.data.user.id && item.username === "family-account",
+    ),
+  );
+  assert.equal(
+    Object.hasOwn(memberCandidates.data.users[0], "hasPassword"),
+    false,
+  );
   assert.equal((await request("/api/fnos/users", { uid: 1003, method: "POST", token: adminToken, body: { username: "family-account" } })).status, 409);
   const account = created.data.user;
 
@@ -337,6 +344,12 @@ test("用户管理：只有 NAS 管理员能建号、停用与删除，独立账
   const disabled = await request(`/api/fnos/users/${account.id}`, { uid: 1003, method: "PATCH", token: adminToken, body: { disabled: true } });
   assert.equal(disabled.status, 200);
   assert.equal(disabled.data.user.disabled, true);
+  assert.equal(
+    (await request("/api/fnos/member-candidates")).data.users.some(
+      (item) => item.id === account.id,
+    ),
+    false,
+  );
   assert.equal((await request("/api/workspace", { extra: asTenant })).status, 403);
   const disabledInstall = await request(installPath);
   assert.equal(

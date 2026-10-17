@@ -3,6 +3,9 @@ async (page) => {
   const adminBase = "http://127.0.0.1:18340/app/fnnotes-m0/";
   const tenantBase = "http://127.0.0.1:18338/app/fnnotes-m0/";
   const api = (route, init) => "/app/fnnotes-m0" + route;
+  await page.addInitScript(() => {
+    window.confirm = () => true;
+  });
   // 模拟部分飞牛 WebView / 反向代理不转发 Origin 的写请求。
   await page.route("**/api/**", async (route) => {
     const headers = { ...route.request().headers() };
@@ -203,7 +206,6 @@ async (page) => {
   if (await attemptLogin(username, resetPassword) !== 200) throw new Error("启用后无法登录。");
 
   // 删除：账号消失、不能再登录，其它租户不受影响。
-  page.on("dialog", (dialog) => dialog.accept());
   const removed = page.waitForResponse((response) => response.url().includes("/api/fnos/users/") && response.request().method() === "DELETE");
   await row.getByRole("button", { name: "删除" }).click();
   if ((await removed).status() !== 200) throw new Error("删除独立账号失败。");
@@ -239,9 +241,15 @@ async (page) => {
     await page.getByRole("button", { name: "刷新授权状态" }).click();
     await page.getByText(rememberedPath, { exact: true }).waitFor();
   }
-  await page.getByRole("dialog", { name: "设置", exact: true }).getByRole("button", { name: "关闭设置", exact: true }).click();
-  await page.getByRole("button", { name: /^账号：/ }).click();
-  await page.getByRole("menuitem", { name: "退出登录", exact: true }).click();
+  const settingsDialog = page.getByRole("dialog", { name: "设置", exact: true });
+  if (await settingsDialog.count()) {
+    await settingsDialog.getByRole("button", { name: "关闭设置", exact: true }).click();
+  }
+  const accountTrigger = page.getByRole("button", { name: /^账号：/ });
+  if (await accountTrigger.count()) {
+    await accountTrigger.click();
+    await page.getByRole("menuitem", { name: "退出登录", exact: true }).click();
+  }
   await page.locator(".login-dialog").waitFor();
 
   return {

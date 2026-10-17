@@ -61,7 +61,13 @@ export function FileAccessPanel() {
     if (!paths.length) return [];
     const data = await nativeJson<{ paths: string[] }>(
       "/api/authorized-folders",
-      nativeWrite({ paths }, "POST"),
+      {
+        ...nativeWrite({ paths }, "POST"),
+        headers: {
+          "Content-Type": "application/json",
+          "X-Fnnotes-Host-Picker": "1",
+        },
+      },
     );
     return data.paths;
   }
@@ -161,8 +167,8 @@ export function FileAccessPanel() {
         <div className="settings-card native-form-card">
           {session && !apiConfigured ? (
             <p className="native-warning" role="alert">
-              ACL 自动检查接口还没拿到飞牛的系统凭据；目录选择器可以打开，但授权路径需要等系统 API 就绪后才会登记。
-              可在应用数据目录放 <code>api-token</code>，或设置环境变量{" "}
+              ACL 自动检查接口还没拿到飞牛的系统凭据；目录选择器返回的宿主授权路径仍会保存。
+              若需要进一步自动复核文件 ACL，可在应用数据目录放 <code>api-token</code>，或设置环境变量{" "}
               <code>TRIM_API_TOKEN</code>。
             </p>
           ) : null}

@@ -95,7 +95,7 @@ jobs:
             "${RELEASE_ASSET}" \
             version.json \
             --title "拾光便签 ${APP_VERSION}" \
-            --generate-notes
+            --notes-file RELEASE_NOTES.md
 
       - name: Publish static version manifest
         env:

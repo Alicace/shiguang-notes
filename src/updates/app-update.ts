@@ -145,6 +145,10 @@ export function updateManifestSources(): string[] {
   return [
     latest,
     raw,
+    `https://ghfast.top/${latest}`,
+    `https://ghfast.top/${raw}`,
+    `https://gh-proxy.com/${latest}`,
+    `https://cdn.jsdelivr.net/gh/${repository}@main/version.json`,
   ];
 }
 

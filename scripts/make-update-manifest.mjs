@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const fpkPath = process.env.FPK_PATH || "fnnotes-m0.fpk";
@@ -19,6 +19,7 @@ const assetName =
 const output = process.env.MANIFEST_OUTPUT || "version.json";
 const buffer = readFileSync(path.resolve(fpkPath));
 const changelog = readFileSync(path.resolve("CHANGELOG.md"), "utf8");
+const curatedNotesPath = path.resolve("RELEASE_NOTES.md");
 
 if (buffer.length < 2 || buffer[0] !== 0x1f || buffer[1] !== 0x8b) {
   throw new Error("FPK_PATH 不是有效的 gzip/FPK 安装包");
@@ -34,7 +35,10 @@ const changelogNotes = releaseSection
   .filter((line) => /^[-*]\s+/.test(line))
   .map((line) => line.replace(/^[-*]\s+/, ""))
   .join("\n");
-const releaseNotes = process.env.RELEASE_NOTES || changelogNotes ||
+const curatedNotes = existsSync(curatedNotesPath)
+  ? readFileSync(curatedNotesPath, "utf8").trim()
+  : "";
+const releaseNotes = process.env.RELEASE_NOTES || curatedNotes || changelogNotes ||
   `拾光便签 ${version} 正式版本。`;
 const manifest = {
   version,

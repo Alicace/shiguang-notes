@@ -2147,7 +2147,10 @@ export default function App() {
 
         await nativeJson("/api/authorized-folders", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Fnnotes-Host-Picker": "1",
+          },
           body: JSON.stringify({ paths: [absolutePath] }),
         });
         const result = await importNasImage(absolutePath);

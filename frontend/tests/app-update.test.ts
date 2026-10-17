@@ -20,7 +20,7 @@ test("项目关于页默认指向维护者的 GitHub 仓库", () => {
       "https://github.com/Alicace/shiguang-notes/releases/latest/download/",
     ),
   );
-  assert.ok(updateManifestSources().every((url) => !url.includes("ghfast.top")));
+  assert.ok(updateManifestSources().some((url) => url.includes("ghfast.top")));
   assert.ok(
     updateManifestSources().some((url) =>
       url.includes("Alicace/shiguang-notes/main/version.json"),

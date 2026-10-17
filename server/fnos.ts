@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Express, NextFunction, Request, Response } from "express";
@@ -229,6 +230,15 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
   app.get("/api/fnos/spaces", async (_request, response) => {
     const context = nativeContext.getStore()!;
     response.json({ privateScope: context.user.id, selected: context.scope, writable: context.writable, spaces: await spaces.visible(context.user.id) });
+  });
+  // 共享空间成员选择只需要账号名和 UID，不把停用状态、密码状态等管理字段暴露给普通用户。
+  app.get("/api/fnos/member-candidates", async (_request, response) => {
+    const users = (await store.listManagedAccounts()).filter(
+      (user) => !user.disabled,
+    );
+    response.json({
+      users: users.map(({ id, uid, username, kind }) => ({ id, uid, username, kind })),
+    });
   });
   app.post("/api/fnos/spaces", async (request, response) => {
     const context = nativeContext.getStore()!;
@@ -481,17 +491,42 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
       const real = await fs.realpath(path.resolve(value));
       if (!isManagedFilesystemPath(real)) return null;
       await fs.stat(real);
+      await fs.access(real, fsConstants.R_OK);
       return real.replace(/\/+$/, "") || "/";
     } catch {
       return null;
     }
   };
-  const loadLiveAuthorizedFolders = async (): Promise<string[]> => {
-    if (!(await systemApiToken())) return [];
+  const extractFolderPaths = (value: unknown, depth = 0): string[] => {
+    if (depth > 4 || value == null) return [];
+    if (typeof value === "string") {
+      const pathValue = value.trim();
+      return pathValue.startsWith("/") ? [pathValue] : [];
+    }
+    if (Array.isArray(value)) {
+      return value.flatMap((item) => extractFolderPaths(item, depth + 1));
+    }
+    if (typeof value !== "object") return [];
+    const record = value as Record<string, unknown>;
+    for (const key of ["paths", "folders", "items", "list", "data", "result"]) {
+      const found = extractFolderPaths(record[key], depth + 1);
+      if (found.length) return found;
+    }
+    for (const key of ["path", "folder", "directory"]) {
+      const found = extractFolderPaths(record[key], depth + 1);
+      if (found.length) return found;
+    }
+    return [];
+  };
+  const loadLiveAuthorizedFolders = async (): Promise<{ healthy: boolean; paths: string[] }> => {
+    if (!(await systemApiToken())) return { healthy: false, paths: [] };
     try {
       const value = await systemApi("trim.file.getUserAccessibleFolders", { uid: nativeContext.getStore()!.uid });
-      return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.startsWith("/")) : [];
-    } catch { return []; }
+      return {
+        healthy: value != null,
+        paths: Array.from(new Set(extractFolderPaths(value))),
+      };
+    } catch { return { healthy: false, paths: [] }; }
   };
   const loadAuthorizedRoots = async (userId: string): Promise<string[]> => {
     const remembered = (await readAuthorizedFolders())[userId] || [];
@@ -499,7 +534,11 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
       .filter((item): item is string => Boolean(item));
     // Once the host API is available, its ACL is authoritative. A stale
     // remembered path must not keep working after the user loses access.
-    return (await systemApiToken()) ? loadLiveAuthorizedFolders() : normalizedRemembered;
+    if (!(await systemApiToken())) return normalizedRemembered;
+    const live = await loadLiveAuthorizedFolders();
+    return live.healthy
+      ? Array.from(new Set([...live.paths, ...normalizedRemembered]))
+      : normalizedRemembered;
   };
   const isPathInside = (root: string, candidate: string): boolean => {
     const relative = path.relative(root, candidate);
@@ -522,12 +561,48 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
     const candidates = Array.isArray(input)
       ? input.filter((item: unknown): item is string => typeof item === "string" && item.startsWith("/") && !item.includes("\0") && item.length <= 4096).slice(0, 64)
       : [];
-    const live = (await Promise.all(
-      (await loadLiveAuthorizedFolders()).map(normalizeAuthorizedPath),
-    )).filter((item): item is string => Boolean(item));
-    const verified = (await Promise.all(candidates.map(normalizeAuthorizedPath)))
-      .filter((item): item is string => Boolean(item))
-      .filter((candidate) => live.some((folder) => isPathInside(folder, candidate)));
+    const live = await loadLiveAuthorizedFolders();
+    const normalizedLive = (await Promise.all(live.paths.map(normalizeAuthorizedPath)))
+      .filter((item): item is string => Boolean(item));
+    const normalizedCandidates = (await Promise.all(candidates.map(normalizeAuthorizedPath)))
+      .filter((item): item is string => Boolean(item));
+    const hostPicker = request.get("x-fnnotes-host-picker") === "1";
+    const verified: string[] = [];
+    for (const candidate of normalizedCandidates) {
+      const insideLiveRoot = normalizedLive.some((folder) => isPathInside(folder, candidate));
+      if (insideLiveRoot) {
+        verified.push(candidate);
+        continue;
+      }
+      if (!hostPicker) continue;
+      // A selected path may not appear in the host's folder list yet. If the
+      // host API is available, verify the exact file/folder ACL before saving.
+      if (!(await systemApiToken())) {
+        verified.push(candidate);
+        continue;
+      }
+      try {
+        const permissions = await systemApi("trim.file.checkUserACL", {
+          uid: nativeContext.getStore()!.uid,
+          path: candidate,
+        });
+        const list = Array.isArray(permissions)
+          ? permissions
+          : permissions && typeof permissions === "object"
+            ? (permissions as { permissions?: unknown }).permissions
+            : null;
+        const readable = (Array.isArray(list) && list.some(
+          (item) => item && typeof item === "object" &&
+            (item as { readable?: unknown }).readable === true,
+        )) || Boolean(
+          permissions && typeof permissions === "object" &&
+            (permissions as { readable?: unknown }).readable === true,
+        );
+        if (readable) verified.push(candidate);
+      } catch {
+        // Fail closed when the host API cannot verify the selected path.
+      }
+    }
     const paths = await updateAuthorizedFolders((store_) => {
       store_[userId] = Array.from(new Set([...(store_[userId] || []), ...verified]));
       return store_[userId];

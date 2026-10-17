@@ -4,7 +4,6 @@ import { recorder } from "../../fnos/m0/ui/diagnostics.js";
 import {
   nativeJson,
   nativeWrite,
-  useNativeSession,
   type ManagedUser,
   type Space,
 } from "./api.js";
@@ -16,14 +15,16 @@ interface SpacesPanelProps {
 // 共享空间：创建工作区、按账号授权成员、切换与删除。成员既可从账号列表挑，
 // 也可以直接填 NAS UID 先邀请（对方首次登录后再生效）。
 export function SpacesPanel({ onSpaceChange }: SpacesPanelProps) {
-  const session = useNativeSession();
   const [spaces, setSpaces] = useState<Space[]>([]);
-  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [users, setUsers] = useState<
+    Array<Pick<ManagedUser, "id" | "kind" | "uid" | "username">>
+  >([]);
   const [userId, setUserId] = useState("");
   const [name, setName] = useState("");
   const [uid, setUid] = useState("");
   const [role, setRole] = useState("viewer");
   const [memberUserId, setMemberUserId] = useState("");
+  const [expandedSpaceId, setExpandedSpaceId] = useState("");
   const [status, setStatus] = useState("");
 
   const refreshSpaces = useCallback(async () => {
@@ -33,21 +34,21 @@ export function SpacesPanel({ onSpaceChange }: SpacesPanelProps) {
     setUserId(data.privateScope);
     setSpaces(data.spaces);
   }, []);
+  const refreshUsers = useCallback(async () => {
+    const data = await nativeJson<{
+      users: Array<Pick<ManagedUser, "id" | "kind" | "uid" | "username">>;
+    }>("/api/fnos/member-candidates");
+    setUsers(data.users);
+    return data.users;
+  }, []);
 
   useEffect(() => {
     let active = true;
-    const isAdmin = session?.user.isAdmin ?? false;
 
     void (async () => {
       try {
         await refreshSpaces();
-        // 账号列表只有管理员能读：普通账号直接按 NAS UID 邀请，不发这个必定 403 的请求。
-        const data = isAdmin
-          ? await nativeJson<{ users: ManagedUser[] }>("/api/fnos/users").catch(
-              () => ({ users: [] }),
-            )
-          : { users: [] };
-        if (active) setUsers(data.users);
+        await refreshUsers();
       } catch (error) {
         if (active) {
           setStatus(error instanceof Error ? error.message : "读取共享空间失败。");
@@ -58,7 +59,7 @@ export function SpacesPanel({ onSpaceChange }: SpacesPanelProps) {
     return () => {
       active = false;
     };
-  }, [refreshSpaces, session?.user.isAdmin]);
+  }, [refreshSpaces, refreshUsers]);
 
   function run(operation: () => Promise<void>): void {
     void operation().catch((error) => {
@@ -80,6 +81,23 @@ export function SpacesPanel({ onSpaceChange }: SpacesPanelProps) {
       </p>
 
       <div className="settings-card native-form-card">
+        <div className="native-actions">
+          <button
+            type="button"
+            onClick={() =>
+              run(async () => {
+                const refreshedUsers = await refreshUsers();
+                setStatus(
+                  refreshedUsers.length
+                    ? `已读取 ${refreshedUsers.length} 个可邀请账号。`
+                    : "暂未读取到其他账号，可按 NAS UID 邀请，或在用户管理中创建账号。",
+                );
+              })
+            }
+          >
+            刷新成员账号
+          </button>
+        </div>
         <label className="native-field">
           <span>当前工作区</span>
           <select
@@ -124,9 +142,13 @@ export function SpacesPanel({ onSpaceChange }: SpacesPanelProps) {
               onClick={() =>
                 run(async () => {
                   recorder.action("space.create");
-                  await nativeJson("/api/fnos/spaces", nativeWrite({ name }));
+                  const created = await nativeJson<Space>(
+                    "/api/fnos/spaces",
+                    nativeWrite({ name }),
+                  );
                   setName("");
                   await refreshSpaces();
+                  setExpandedSpaceId(created.id);
                 })
               }
             >
@@ -142,7 +164,14 @@ export function SpacesPanel({ onSpaceChange }: SpacesPanelProps) {
 
         return (
           <div className="settings-card native-space-list" key={space.id}>
-            <details className="native-space">
+            <details
+              className="native-space"
+              open={expandedSpaceId === space.id}
+              onToggle={(event) => {
+                if (event.currentTarget.open) setExpandedSpaceId(space.id);
+                else if (expandedSpaceId === space.id) setExpandedSpaceId("");
+              }}
+            >
               <summary>{space.name} · 管理成员</summary>
               <div className="native-space-content">
                 <p className="native-help">
