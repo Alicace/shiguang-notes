@@ -1,12 +1,6 @@
 name: Publish Docker Image
 
 on:
-  push:
-    branches:
-      - dev
-      - main
-    tags:
-      - "v*"
   workflow_dispatch:
 
 permissions:
@@ -14,7 +8,6 @@ permissions:
 
 jobs:
   publish:
-    if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
     runs-on: ubuntu-latest
 
     steps:
