@@ -5,7 +5,7 @@
 //
 // 分级模式：配置了 baseUrl 走「写入便签列表」；未配置任何用户信息时，通过
 // 默认演示服务器（notes.fangyuanxiaozhan.com）的匿名导出接口把对话渲染成
-// 锤子便签长图 PNG，让未配置用户开箱即用尝鲜。
+// 拾光便签长图 PNG，让未配置用户开箱即用尝鲜。
 import { randomUUID } from "node:crypto";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -478,7 +478,7 @@ export class NotesClient {
   }
 
   /**
-   * 通过匿名导出接口把 Markdown 渲染为锤子便签长图 PNG（无需登录）。
+   * 通过匿名导出接口把 Markdown 渲染为拾光便签长图 PNG（无需登录）。
    * 返回 PNG 字节与服务器上的公开 URL（X-Export-Url 响应头）。
    */
   async exportImage(

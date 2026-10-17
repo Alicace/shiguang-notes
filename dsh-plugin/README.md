@@ -1,6 +1,6 @@
 # @zhaoolee/dsh-notes
 
-DeepSeek Harness 插件：把用户对话导出为锤子便签。
+DeepSeek Harness 插件：把用户对话导出为拾光便签。
 
 Host 面工具插件。安装后，智能体获得一个 `notes_export_conversation` 工具，**分级模式**
 工作：
@@ -9,10 +9,14 @@ Host 面工具插件。安装后，智能体获得一个 `notes_export_conversat
    Markdown 后调用，工具通过便签服务 API 在当前账号的云端工作区**新建**一张便签，或按
    `note_id` **更新**已有便签，返回便签 ID、标题和可打开的前端链接。
 2. **未配置任何用户信息**：回退到默认演示服务器 `https://notes.fangyuanxiaozhan.com` 的
-   匿名导出接口，把对话渲染成锤子便签长图 PNG 保存到本地并返回文件路径——开箱即用尝鲜，
+   匿名导出接口，把对话渲染成拾光便签长图 PNG 保存到本地并返回文件路径——开箱即用尝鲜，
    但**不能写入便签列表**（匿名模式没有账号工作区）。
 
-配套的开源便签服务：<https://github.com/zhaoolee/notes>
+配套的开源便签服务：<https://github.com/Alicace/shiguang-notes>
+
+本插件随拾光便签一起维护；拾光便签基于
+<https://github.com/zhaoolee/notes> 二次开发，详细来源与许可见主仓库 README、LICENSE
+和 NOTICE。
 
 ## 安装
 
@@ -93,7 +97,7 @@ NOTES_API_TOKEN=notes_sk_v1.xxx
 - `folder`（写入模式）：文件夹 ID 或精确名称；`none` / `null` / `未分类` 表示清除分类。
 - `starred`（写入模式）：是否加星。
 - `pinned`（写入模式）：是否置顶。
-- `theme`（图片模式）：便签主题，`default` / `smartisan-dark` / `apple-notes` /
+- `theme`（图片模式）：便签主题，`default` / `dark` / `apple-notes` /
   `apple-notes-light` / `bear` / `telegraph`，默认 `default`。
 
 返回 `{ action, note_id, title, url, file_path, updated_at, server }`：

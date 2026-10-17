@@ -68,7 +68,7 @@ test("生产镜像包含归档资源和 Hermes Skill 下载模板", async () => 
     );
     assert.match(
       dockerfile,
-      /COPY public\/smartisan\/web\/smartisan_hammer_footer\.png \.\/public\/smartisan\/web\/smartisan_hammer_footer\.png/,
+      /COPY public\/brand\/shiguang-footer-logo\.png \.\/public\/brand\/shiguang-footer-logo\.png/,
     );
     assert.match(
       dockerfile,

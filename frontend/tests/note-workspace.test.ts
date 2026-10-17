@@ -79,7 +79,11 @@ test("持久化工作区校验便签集合并修复失效的当前 ID", () => {
   assert.ok(workspace);
   assert.equal(workspace.activeNoteId, firstNote.id);
   assert.deepEqual(workspace.folders, []);
-  assert.deepEqual(workspace.notes, [firstNote, secondNote]);
+  // 读写会给缺失字段补默认值：排版模式与字号档位。
+  assert.deepEqual(workspace.notes, [
+    { ...firstNote, fontScale: 1, formattingMode: "markdown", richText: null },
+    { ...secondNote, fontScale: 1, formattingMode: "markdown", richText: null },
+  ]);
   assert.equal(parseNoteWorkspace('{"version":1,"notes":[]}'), null);
   assert.equal(
     parseNoteWorkspace(
@@ -208,7 +212,7 @@ test("空白新建便签返回列表时丢弃草稿并选中真实下一条", ()
   );
   assert.match(
     storeSource,
-    /discardEmptyDraft:[\s\S]*discardEmptyNoteDraft\([\s\S]*activeNoteId:\s*discarded\.activeNote\.id,[\s\S]*markdown:\s*discarded\.activeNote\.markdown,/,
+    /discardEmptyDraft:[\s\S]*discardEmptyNoteDraft\([\s\S]*activeNoteId:\s*discarded\.activeNote\.id,[\s\S]*\.\.\.activeContent\(discarded\.activeNote\),/,
   );
 });
 
@@ -454,7 +458,7 @@ test("便签选择始终按唯一 ID 加载对应正文而非列表位置", () =
   assert.match(sidebarSource, /key=\{note\.id\}/);
   assert.match(
     storeSource,
-    /selectNote:\s*\(noteId\)\s*=>\s*\{[\s\S]*getNoteDocumentById\(get\(\)\.notes,\s*noteId\);[\s\S]*activeNoteId:\s*note\.id,[\s\S]*markdown:\s*note\.markdown,/s,
+    /selectNote:\s*\(noteId\)\s*=>\s*\{[\s\S]*getNoteDocumentById\(get\(\)\.notes,\s*noteId\);[\s\S]*activeNoteId:\s*note\.id,[\s\S]*\.\.\.activeContent\(note\),/s,
   );
 });
 
@@ -519,7 +523,7 @@ test("分类侧栏呈现官方四类入口、数量与自定义文件夹", () =>
       desktopFooter: createElement(
         "button",
         { type: "button" },
-        "登录锤子便签",
+        "登录拾光便签",
       ),
       folders: [folder],
       isOpen: true,
@@ -541,14 +545,14 @@ test("分类侧栏呈现官方四类入口、数量与自定义文件夹", () =>
   assert.match(html, /placeholder="快速搜索关键字"/);
   assert.match(html, /aria-current="page"/);
   assert.match(html, /class="category-desktop-footer"/);
-  assert.match(html, /登录锤子便签/);
-  assert.doesNotMatch(html, /下载锤子便签 APP/);
+  assert.match(html, /登录拾光便签/);
+  assert.doesNotMatch(html, /下载拾光便签 APP/);
   assert.ok(html.indexOf("全部便签") < html.indexOf("加星便签"));
   assert.ok(html.indexOf("加星便签") < html.indexOf("工作"));
   assert.ok(html.indexOf("工作") < html.indexOf("回收站"));
 });
 
-test("便签侧栏保持锤子网页版的紧凑视觉参数", () => {
+test("便签侧栏保持上游网页版的紧凑视觉参数", () => {
   const styles = readFileSync("src/styles.css", "utf8");
 
   assert.match(styles, /--note-list-surface:\s*#fbf7ed;/);
@@ -613,7 +617,8 @@ test("移动端采用便签列表、编辑和预览三态工作区", () => {
   assert.match(appSource, /data-mobile-view=\{mobileWorkspaceView\}/);
   assert.match(appSource, /className="mobile-workspace-tabs"/);
   assert.match(appSource, /className="mobile-note-stats"/);
-  assert.match(appSource, /className="mobile-view-toggle"/);
+  assert.match(appSource, /className="mobile-format-mode-trigger"/);
+  assert.match(appSource, /mobile-note-star/);
   assert.match(appSource, /aria-label="返回便签列表"/);
   assert.match(
     styles,
@@ -621,7 +626,7 @@ test("移动端采用便签列表、编辑和预览三态工作区", () => {
   );
   assert.match(
     styles,
-    /@media \(max-width: 640px\)[\s\S]*\.app-layout\s*\{[^}]*position:\s*fixed;[^}]*top:\s*0;[^}]*right:\s*0;[^}]*left:\s*0;[^}]*width:\s*auto;[^}]*max-width:\s*none;[^}]*height:\s*calc\([^}]*--mobile-visual-viewport-height,[^}]*--mobile-visual-viewport-offset-top,[^}]*\);[^}]*max-height:\s*calc\([^}]*--mobile-visual-viewport-height,[^}]*--mobile-visual-viewport-offset-top,[^}]*\);[^}]*padding-top:\s*var\(--mobile-visual-viewport-offset-top,\s*0px\);[^}]*overflow:\s*hidden;/s,
+    /@media \(max-width: 640px\)[\s\S]*\.app-layout\s*\{[^}]*position:\s*fixed;[^}]*top:\s*var\(--mobile-visual-viewport-offset-top,\s*0px\);[^}]*right:\s*0;[^}]*left:\s*0;[^}]*width:\s*auto;[^}]*max-width:\s*none;[^}]*height:\s*var\(--mobile-visual-viewport-height,\s*100dvh\);[^}]*max-height:\s*var\(--mobile-visual-viewport-height,\s*100dvh\);[^}]*overflow:\s*hidden;/s,
   );
   assert.match(
     styles,
@@ -698,7 +703,8 @@ test("移动端采用便签列表、编辑和预览三态工作区", () => {
   );
   assert.match(
     styles,
-    /@media \(max-width: 640px\)[\s\S]*--editor-line-height:\s*42px;[\s\S]*\.markdown-editor\.uses-fixed-mobile-caret\s*\{[^}]*caret-color:\s*transparent;[^}]*\}[\s\S]*\.markdown-editor-fixed-caret\s*\{[^}]*height:\s*22px;[^}]*background:\s*var\(--editor-caret-color\);/s,
+    // 手机端行高同样跟随便签字号档位缩放。
+    /@media \(max-width: 640px\)[\s\S]*--editor-line-height:\s*calc\(42px \* var\(--note-font-scale, 1\)\);[\s\S]*\.markdown-editor\.uses-fixed-mobile-caret\s*\{[^}]*caret-color:\s*transparent;[^}]*\}[\s\S]*\.markdown-editor-fixed-caret\s*\{[^}]*height:\s*22px;[^}]*background:\s*var\(--editor-caret-color\);/s,
   );
   assert.match(
     styles,
@@ -819,6 +825,19 @@ test("移动端采用便签列表、编辑和预览三态工作区", () => {
   assert.doesNotMatch(styles, /:has\(\.markdown-editor:focus\)/);
 });
 
+test("删除最后一张正常便签后保留空工作区，由用户主动新建", () => {
+  const storeSource = readFileSync("src/store/useAppStore.ts", "utf8");
+
+  assert.match(
+    storeSource,
+    /activeNoteId:\s*pendingAction\.noteId,\s*exportError:\s*"",\s*markdown:\s*"",\s*richText:\s*null,\s*notes:\s*deletedNotes,/,
+  );
+  assert.doesNotMatch(
+    storeSource,
+    /liveNotes\.length === 0\s*\{[\s\S]{0,300}?createNoteDocument\(/,
+  );
+});
+
 test("移动分类使用顶栏锚定浮窗覆盖列表而不替换正文", () => {
   const appSource = readFileSync("src/App.tsx", "utf8");
   const categorySource = readFileSync(
@@ -843,11 +862,11 @@ test("移动分类使用顶栏锚定浮窗覆盖列表而不替换正文", () =>
   assert.match(categorySource, /className="category-popover-create"/);
   assert.match(
     styles,
-    /Smartisan Notes desktop web parity layer[\s\S]*\.category-popover-backdrop\.is-visible\s*\{[^}]*background:\s*transparent;/s,
+    /Upstream-inspired desktop web parity layer[\s\S]*\.category-popover-backdrop\.is-visible\s*\{[^}]*background:\s*transparent;/s,
   );
   assert.match(
     styles,
-    /Smartisan Notes desktop web parity layer[\s\S]*\.category-sidebar,\s*\.category-sidebar\.is-open\s*\{[^}]*inset:\s*16px 31px auto;[^}]*border:\s*1px solid #cfcac5;[^}]*border-radius:\s*8px;[^}]*opacity:\s*0;/s,
+    /Upstream-inspired desktop web parity layer[\s\S]*\.category-sidebar,\s*\.category-sidebar\.is-open\s*\{[^}]*inset:\s*16px 31px auto;[^}]*border:\s*1px solid #cfcac5;[^}]*border-radius:\s*8px;[^}]*opacity:\s*0;/s,
   );
   assert.match(
     styles,
@@ -884,10 +903,8 @@ test("项目使用桌面官方三栏和手机布局，不提供平板堆叠版",
     /useState<DesktopWorkspaceView>\("editor"\)/,
   );
   assert.match(appSource, /data-desktop-view=\{desktopWorkspaceView\}/);
-  assert.match(appSource, /aria-label="切换编辑与实时预览"/);
-  assert.match(appSource, /className="desktop-view-menu" role="menu"/);
-  assert.match(appSource, /\["editor", "Markdown 模式"\]/);
-  assert.match(appSource, /\["preview", "实时预览"\]/);
+  assert.match(appSource, /desktopWorkspaceView === "editor" \? "切换到实时预览" : "切换到编辑"/);
+  assert.doesNotMatch(appSource, /desktopViewMenuRef|isDesktopViewMenuOpen/);
   assert.match(
     styles,
     /\.app-layout:not\(\[data-render-mode="playwright"\]\)\[data-desktop-view="editor"\] \.preview-panel,[\s\S]*\[data-desktop-view="preview"\] \.editor-panel\s*\{[^}]*display:\s*none;/s,
@@ -898,7 +915,7 @@ test("项目使用桌面官方三栏和手机布局，不提供平板堆叠版",
   );
 });
 
-test("桌面工作区使用锤子便签网页版的纸面、细线和栏宽比例", () => {
+test("桌面工作区使用拾光便签网页版的纸面、细线和栏宽比例", () => {
   const appSource = readFileSync("src/App.tsx", "utf8");
   const editorSource = readFileSync("src/components/EditorPanel.tsx", "utf8");
   const styles = readFileSync("src/styles.css", "utf8");
@@ -936,15 +953,29 @@ test("桌面工作区使用锤子便签网页版的纸面、细线和栏宽比�
   );
   assert.match(
     styles,
-    /\.desktop-view-switch-trigger\s*\{[^}]*height:\s*24px;[^}]*border:\s*1px solid var\(--note-list-divider\);[^}]*font-size:\s*13px;/s,
+    /\.desktop-workspace-view-toggle svg\s*\{[^}]*width:\s*18px;[^}]*stroke:\s*rgba\(255,\s*255,\s*255,\s*0\.92\);/s,
   );
   assert.match(
     styles,
-    /\.desktop-view-menu\s*\{[^}]*top:\s*32px;[^}]*width:\s*202px;[^}]*min-height:\s*110px;[^}]*border:\s*1px solid #e2dcd6;[^}]*border-radius:\s*5px;[^}]*box-shadow:\s*0 8px 15px rgba\(58,\s*45,\s*35,\s*0\.15\);/s,
+    /\.desktop-view-menu\s*\{[^}]*top:\s*32px;[^}]*width:\s*216px;[^}]*border:\s*1px solid #e2dcd6;[^}]*border-radius:\s*6px;[^}]*box-shadow:\s*0 8px 15px rgba\(58,\s*45,\s*35,\s*0\.15\);/s,
   );
   assert.match(
     styles,
-    /\.desktop-view-menu button\s*\{[^}]*height:\s*52px;[^}]*min-height:\s*52px;/s,
+    /\.desktop-view-menu button\s*\{[^}]*height:\s*44px;[^}]*min-height:\s*44px;/s,
+  );
+  // 选单项之间用细分隔线分档（官方样式），模式档位不再挤成一片。
+  assert.match(
+    styles,
+    /\.desktop-view-menu button \+ button\s*\{\s*border-top:\s*1px solid #eee7dd;\s*\}/,
+  );
+  // 排版模式下拉按最长档位「Markdown 模式」定宽：切档不跳动，文案不被裁。
+  assert.match(
+    styles,
+    /\.desktop-format-mode\s*\{[^}]*width:\s*170px;[^}]*flex:\s*0 0 170px;/s,
+  );
+  assert.match(
+    styles,
+    /\.desktop-left-actions\s*\{[^}]*right:\s*calc\(\s*100% - var\(--category-sidebar-width\) - var\(--note-sidebar-width\) \+ 14px\s*\);/s,
   );
   assert.doesNotMatch(appSource, /className="note-list-delete"/);
   assert.match(
@@ -1027,8 +1058,10 @@ test("桌面工作区使用锤子便签网页版的纸面、细线和栏宽比�
   assert.match(appSource, /aria-busy=\{isRefreshingNotes\}/);
   assert.match(
     appSource,
-    /function handleRefreshNotes\(\)[\s\S]*setIsRefreshingNotes\(true\);[\s\S]*window\.location\.reload\(\);[\s\S]*NOTE_REFRESH_DELAY_MS/s,
+    /function handleRefreshNotes\(\)[\s\S]*setIsRefreshingNotes\(true\);[\s\S]*getCloudWorkspace\(\)[\s\S]*setIsRefreshingNotes\(false\);/s,
   );
+  // 刷新按钮不再整页 reload：就地重取工作区。
+  assert.doesNotMatch(appSource, /window\.location\.reload\(\);/);
   assert.match(
     styles,
     /\.desktop-refresh-note\.is-refreshing \.icon-refresh\s*\{[^}]*animation:\s*smartisan-refresh-spin 600ms cubic-bezier\(0\.4,\s*0,\s*0\.2,\s*1\) both;[^}]*will-change:\s*transform;/s,
@@ -1050,7 +1083,7 @@ test("桌面工作区使用锤子便签网页版的纸面、细线和栏宽比�
   );
   assert.match(
     styles,
-    /@media \(min-width:\s*641px\)[\s\S]*\.desktop-left-actions\s*\{[^}]*top:\s*12px;[^}]*left:\s*calc\(var\(--category-sidebar-width\) \+ var\(--note-sidebar-width\) - 165px\);[^}]*gap:\s*14px;/s,
+    /@media \(min-width:\s*641px\)[\s\S]*\.desktop-left-actions\s*\{[^}]*top:\s*12px;[^}]*right:\s*calc\([^}]*\);[^}]*gap:\s*14px;/s,
   );
   assert.match(
     styles,
@@ -1106,7 +1139,7 @@ test("桌面工作区使用锤子便签网页版的纸面、细线和栏宽比�
     appSource,
     /const \[isDesktopFocusMode, setIsDesktopFocusMode\] = useState\(false\);/,
   );
-  assert.match(appSource, /className="desktop-note-folder-icon"/);
+  assert.match(appSource, /className="desktop-note-star-icon"/);
   assert.match(appSource, /className="desktop-focus-toggle"/);
   assert.match(
     appSource,
@@ -1118,7 +1151,7 @@ test("桌面工作区使用锤子便签网页版的纸面、细线和栏宽比�
   );
   assert.match(
     styles,
-    /\.desktop-note-folder-icon\s*\{[^}]*background-position:\s*-715px -39px;/s,
+    /\.desktop-note-star-icon\s*\{[^}]*background-position:\s*-95px -310px;/s,
   );
   assert.match(
     styles,

@@ -15,9 +15,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import sharp, { type Metadata } from "sharp";
 import { NoteSheet } from "../src/components/NoteSheet.js";
 import { WechatArticle } from "../src/components/WechatArticle.js";
+import { normalizeNoteFontScale } from "../src/lib/note-typography.js";
 import {
   DEFAULT_FOOTER_BRAND,
   DEFAULT_FOOTER_LOGO_URL,
+  LEGACY_FOOTER_LOGO_URLS,
   DEFAULT_FOOTER_VIA,
   FOOTER_LOGO_URL_MAX_LENGTH,
 } from "../src/lib/footer.js";
@@ -87,8 +89,10 @@ import {
   type WechatPermanentImage,
 } from "./wechat-official.js";
 import { installNativeGateway, installNativeRoutes, nativeContext, nativeMode, nativePrefix, NativeSpaces } from "./fnos.js";
+import { LoginThrottle, loginThrottleKeys } from "./login-throttle.js";
 
 interface ExportRequestBody {
+  fontScale?: number;
   markdown?: string;
   markdownPath?: string;
   theme?: string;
@@ -103,6 +107,7 @@ interface ImageImportRequestBody {
 }
 
 interface ArchiveRequestBody {
+  fontScale?: number;
   markdown?: string;
   markdownPath?: string;
   theme?: string;
@@ -116,6 +121,7 @@ interface WorkspaceArchiveRequestBody {
 }
 
 interface WechatRequestBody {
+  fontScale?: number;
   markdown?: string;
   markdownPath?: string;
   theme?: string;
@@ -295,10 +301,44 @@ const activeAiUsers = new Set<string>();
 const aiRequestHistory = new Map<string, number[]>();
 const workspaceArchiveJobs = new Map<string, WorkspaceArchiveJob>();
 const notesDataStore = new NotesDataStore(dataDirectory);
+const loginThrottle = new LoginThrottle();
+
+// 登录节流按「账号 + 来源」双桶计数：来源在飞牛网关内用 NAS UID，直连时用来源地址。
+function loginClientKey(request: Request): string {
+  const uid = nativeContext.getStore()?.uid;
+  return uid ? `nas-${uid}` : request.ip || "unknown";
+}
+
+function respondThrottled(response: Response, seconds: number): void {
+  response.setHeader("Retry-After", String(seconds));
+  response.status(429).json({
+    error: `密码连续错误，请在 ${seconds} 秒后重试。`,
+  });
+}
 const nativeSpaces = new NativeSpaces(path.join(dataDirectory, "shared-spaces.json"));
 const execFileAsync = promisify(execFile);
-const defaultWechatFooterHammerUrl =
-  "https://notes.fangyuanxiaozhan.com/images/b5d3bd9587fa9a1226b25a0709ff61a450df29d96ca2f127c6afc0b8e193a60e.png";
+
+// 飞牛版默认页脚 Logo 会被前端加上应用前缀（/app/fnnotes-m0/...），
+// 判断「是否还是默认 Logo」时必须忽略前缀，否则每篇便签都会被当成自定义图床图片，
+// 公众号复制/草稿就会因为缺少七牛配置而直接失败。
+function isDefaultFooterLogo(url: string | undefined): boolean {
+  if (!url) {
+    return true;
+  }
+
+  const normalized = url.replace(/^\/app\/fnnotes-m0/, "");
+
+  return (
+    normalized === DEFAULT_FOOTER_LOGO_URL ||
+    LEGACY_FOOTER_LOGO_URLS.includes(normalized)
+  );
+}
+
+// 公众号里的页脚标志必须是微信能访问到的图片。复制到公众号的 HTML 只接受公网外链，
+// 默认留空即输出纯文字页脚（0.7.4 起不再为默认 Logo 要求七牛图床）；
+// 草稿提交会把随包标志直接上传给微信，因此草稿仍用内置页脚标志作为默认值。
+const defaultWechatFooterLogoUrl = "";
+const defaultWechatDraftFooterLogoUrl = DEFAULT_FOOTER_LOGO_URL;
 const archiveFonts: ArchiveFont[] = [
   {
     sourceName: "OPPOSans-R.ttf",
@@ -336,6 +376,7 @@ function buildRenderUrl(
   baseUrl: string,
   theme: NoteCardThemeId,
   footer?: FooterConfig,
+  fontScale = 1,
 ): string {
   const url = new URL("/", baseUrl);
   url.searchParams.set("renderMode", "playwright");
@@ -353,6 +394,10 @@ function buildRenderUrl(
     url.searchParams.set("footerVia", footer.via);
   }
 
+  if (fontScale !== 1) {
+    url.searchParams.set("fontScale", String(fontScale));
+  }
+
   return url.toString();
 }
 
@@ -360,13 +405,14 @@ function getRenderUrl(
   request: Request,
   theme: NoteCardThemeId,
   footer?: FooterConfig,
+  fontScale = 1,
 ): string {
   if (process.env.EXPORT_APP_URL) {
-    return buildRenderUrl(process.env.EXPORT_APP_URL, theme, footer);
+    return buildRenderUrl(process.env.EXPORT_APP_URL, theme, footer, fontScale);
   }
 
   const baseUrl = getPublicBaseUrl(request);
-  return buildRenderUrl(baseUrl, theme, footer);
+  return buildRenderUrl(baseUrl, theme, footer, fontScale);
 }
 
 function getPublicBaseUrl(request: Request): string {
@@ -840,6 +886,8 @@ function resolveTheme(body: ExportRequestBody): NoteCardThemeId {
     return "default";
   }
 
+  if (body.theme === "dark") return "smartisan-dark";
+
   if (
     typeof body.theme === "string" &&
     supportedThemes.has(body.theme as NoteCardThemeId)
@@ -1117,6 +1165,7 @@ function buildArchiveIndexHtml(
   footer: FooterConfig,
   fonts: ArchiveFont[],
   theme: NoteCardThemeId,
+  fontScale = 1,
 ): string {
   const noteSheetHtml = renderArchiveNoteSheet(markdown, footer);
   const fontFaceCss = buildArchiveFontFaceCss(fonts);
@@ -1143,6 +1192,12 @@ function buildArchiveIndexHtml(
 ${fontFaceCss}
       :root {
         ${buildNoteCardThemeCssVariables(theme)}
+        --note-font-scale: ${fontScale};
+
+        .note-copy {
+          zoom: var(--note-font-scale, 1);
+          width: calc(100% / var(--note-font-scale, 1));
+        }
         --note-font: ${archiveFontFamily};
         --note-heading-font: ${archiveHeadingFontFamily};
         --note-scale: 2;
@@ -2239,6 +2294,7 @@ async function buildArchive(
   markdown: string,
   footer: FooterConfig = {},
   theme: NoteCardThemeId = "default",
+  fontScale = 1,
 ): Promise<{ filename: string; zipBuffer: Buffer }> {
   const basename = buildArchiveBasename(markdown);
   const folderName = basename;
@@ -2332,6 +2388,7 @@ async function buildArchive(
           archivedFooter,
           fontAssets.fonts,
           theme,
+          fontScale,
         ),
         "utf8",
       ),
@@ -2407,8 +2464,8 @@ function buildWorkspaceArchiveNames(): { filename: string; rootFolder: string } 
   ].join("-");
 
   return {
-    filename: `smartisan-notes-${formatted}.zip`,
-    rootFolder: `锤子便签-${formatted}`,
+    filename: `shiguang-notes-${formatted}.zip`,
+    rootFolder: `拾光便签-${formatted}`,
   };
 }
 
@@ -2421,7 +2478,7 @@ function buildWorkspaceArchiveReadme(
   ).length;
 
   return [
-    "# 锤子便签整体导出",
+    "# 拾光便签整体导出",
     "",
     `- 导出时间：${exportedAt.toISOString()}`,
     `- 自定义文件夹：${workspace.folders.length}`,
@@ -3459,15 +3516,18 @@ function renderWechatArticle(
   markdown: string,
   footer: FooterConfig,
   theme: NoteCardThemeId,
+  fontScale = 1,
+  fallbackLogoUrl = defaultWechatFooterLogoUrl,
 ): string {
   const footerHammerUrl =
-    footer.logoUrl && footer.logoUrl !== DEFAULT_FOOTER_LOGO_URL
-      ? footer.logoUrl
-      : process.env.WECHAT_FOOTER_HAMMER_URL?.trim() ||
-        defaultWechatFooterHammerUrl;
+    !isDefaultFooterLogo(footer.logoUrl)
+      ? footer.logoUrl!
+      : process.env.WECHAT_FOOTER_LOGO_URL?.trim() ||
+        fallbackLogoUrl;
 
   return renderToStaticMarkup(
     createElement(WechatArticle, {
+      fontScale,
       footerBrand: footer.brand ?? DEFAULT_FOOTER_BRAND,
       markdown,
       footerHammerUrl,
@@ -3484,14 +3544,13 @@ function prepareWechatDraftArticle(
   markdown: string,
   footer: FooterConfig,
   theme: NoteCardThemeId,
+  fontScale = 1,
 ) {
   const articleSources = collectMarkdownImageSources(markdown);
   const sources = Array.from(
     new Set([
       ...articleSources,
-      ...(footer.logoUrl && footer.logoUrl !== DEFAULT_FOOTER_LOGO_URL
-        ? [footer.logoUrl]
-        : []),
+      ...(isDefaultFooterLogo(footer.logoUrl) ? [] : [footer.logoUrl!]),
     ]),
   );
   const sourceByPlaceholder = new Map<string, string>();
@@ -3519,6 +3578,8 @@ function prepareWechatDraftArticle(
         logoUrl: placeholderBySource.get(footer.logoUrl || "") || footer.logoUrl,
       },
       theme,
+      fontScale,
+      defaultWechatDraftFooterLogoUrl,
     ),
     sourceByPlaceholder,
   };
@@ -3527,6 +3588,7 @@ function prepareWechatDraftArticle(
 async function prepareWechatArticle(
   markdown: string,
   options: {
+    fontScale?: number;
     footer: FooterConfig;
     publicBaseUrl: string;
     temporaryUploads: boolean;
@@ -3543,8 +3605,7 @@ async function prepareWechatArticle(
 }> {
   const markdownImageSources = collectMarkdownImageSources(markdown);
   const customFooterLogoSource =
-    options.footer.logoUrl &&
-    options.footer.logoUrl !== DEFAULT_FOOTER_LOGO_URL
+    !isDefaultFooterLogo(options.footer.logoUrl)
       ? options.footer.logoUrl
       : null;
   const imageSources = Array.from(
@@ -3658,12 +3719,13 @@ async function prepareWechatArticle(
 
   const footerHammerUrl = customFooterLogoSource
     ? replacements.get(customFooterLogoSource) || customFooterLogoSource
-    : process.env.WECHAT_FOOTER_HAMMER_URL?.trim() ||
-      defaultWechatFooterHammerUrl;
+    : process.env.WECHAT_FOOTER_LOGO_URL?.trim() ||
+      defaultWechatFooterLogoUrl;
   const html = renderWechatArticle(
     wechatMarkdown,
     { ...options.footer, logoUrl: footerHammerUrl },
     options.theme,
+    options.fontScale ?? 1,
   );
 
   return {
@@ -3738,7 +3800,7 @@ async function resolveWechatDraftImage(
   source: string,
   publicBaseUrl: string,
 ): Promise<ImageSource | null> {
-  if (source === defaultWechatFooterHammerUrl) {
+  if (defaultWechatFooterLogoUrl && source === defaultWechatFooterLogoUrl) {
     return readRootRelativeArchiveImage(DEFAULT_FOOTER_LOGO_URL);
   }
 
@@ -4047,7 +4109,7 @@ async function createWechatTitleCover(
       <rect width="900" height="14" fill="${escapeSvgText(themeStyle.colors.accent)}"/>
       <rect x="34" y="34" width="832" height="315" rx="18" fill="none" stroke="${escapeSvgText(themeStyle.colors.border)}" stroke-width="2"/>
       ${titleMarkup}
-      <text x="450" y="326" text-anchor="middle" fill="${escapeSvgText(themeStyle.colors.footer)}" font-family="Noto Sans CJK SC,Noto Sans SC,PingFang SC,sans-serif" font-size="26">开源版锤子便签</text>
+      <text x="450" y="326" text-anchor="middle" fill="${escapeSvgText(themeStyle.colors.footer)}" font-family="Noto Sans CJK SC,Noto Sans SC,PingFang SC,sans-serif" font-size="26">拾光便签</text>
     </svg>`,
   );
   let buffer: Buffer;
@@ -4225,6 +4287,17 @@ app.post(
       return;
     }
 
+    const throttleKeys = loginThrottleKeys(
+      credentials.username,
+      loginClientKey(request),
+    );
+    const blockedSeconds = loginThrottle.check(throttleKeys);
+
+    if (blockedSeconds > 0) {
+      respondThrottled(response, blockedSeconds);
+      return;
+    }
+
     const superAdmin = authenticateSuperAdmin(credentials);
     const account = superAdmin
       ? null
@@ -4234,9 +4307,15 @@ app.post(
         );
 
     if (!superAdmin && !account) {
+      const retrySeconds = loginThrottle.recordFailure(throttleKeys);
+      console.warn(
+        `[auth] 登录失败 user=${credentials.username} client=${loginClientKey(request)} retryAfter=${retrySeconds}s`,
+      );
       response.status(401).json({ error: "用户名、邮箱或密码错误。" });
       return;
     }
+
+    loginThrottle.clear(throttleKeys);
 
     const user: AuthUser =
       superAdmin ??
@@ -4279,6 +4358,17 @@ app.post(
         return;
       }
 
+      const throttleKeys = loginThrottleKeys(
+        credentials.username,
+        loginClientKey(request),
+      );
+      const blockedSeconds = loginThrottle.check(throttleKeys);
+
+      if (blockedSeconds > 0) {
+        respondThrottled(response, blockedSeconds);
+        return;
+      }
+
       const superAdmin = authenticateSuperAdmin(credentials);
       const account = superAdmin
         ? null
@@ -4288,9 +4378,15 @@ app.post(
           );
 
       if (!superAdmin && !account) {
+        const retrySeconds = loginThrottle.recordFailure(throttleKeys);
+        console.warn(
+          `[auth] Skill Token 凭据失败 user=${credentials.username} client=${loginClientKey(request)} retryAfter=${retrySeconds}s`,
+        );
         response.status(401).json({ error: "用户名、邮箱或密码错误。" });
         return;
       }
+
+      loginThrottle.clear(throttleKeys);
 
       user =
         superAdmin ??
@@ -4467,6 +4563,25 @@ app.post(
 
     const currentPassword = request.body?.currentPassword;
     const newPassword = request.body?.newPassword;
+
+    if (nativeMode && session.id.startsWith("nas-") && !(await notesDataStore.hasAppPassword(session.id))) {
+      if (typeof newPassword !== "string" || !newPassword) {
+        response.status(400).json({ error: "请输入新的应用密码。", hint: "NAS 账号第一次设置应用密码时不需要旧密码。" });
+        return;
+      }
+
+      try {
+        const passwordVersion = await notesDataStore.setFnosAppPassword(session.id, newPassword);
+        setAuthenticatedSession(request, response, getPublicAuthUser(session), true, passwordVersion);
+        await notesDataStore.revokeHermesInstallLink(session.id);
+        response.json({ ok: true, initial: true });
+      } catch (error) {
+        const status = error instanceof InvalidNewPasswordError ? 400 : 500;
+        response.status(status).json({ error: error instanceof Error ? error.message : "设置应用密码失败。" });
+      }
+
+      return;
+    }
 
     if (
       typeof currentPassword !== "string" ||
@@ -4744,14 +4859,18 @@ app.get("/api/workspace", async (request: Request, response: Response) => {
 
   const scope = nativeMode ? nativeContext.getStore()!.scope : user.id;
   let stored = await notesDataStore.getWorkspace(scope);
+  // 每个租户（飞牛账号 / 独立账号）的私有工作区首访时建一条空白便签：
+  // 有旧版 M0 正文就顺带导入，没有也不再返回空工作区——否则新账号进来看不到可编辑的便签。
   if (nativeMode && !stored && scope === user.id) {
+    let initialText = "";
     try {
       const old = JSON.parse(await fs.readFile(path.join(process.env.TRIM_PKGVAR!, "notes", `${nativeContext.getStore()!.uid}.json`), "utf8"));
       if (typeof old.text !== "string") throw new Error("旧版正文格式不正确。");
-      const note = createNoteDocument(old.text);
-      try { stored = await notesDataStore.saveWorkspace(user.id, { version: 1, notes: [note], folders: [], activeNoteId: note.id }, Date.now(), null); }
-      catch (error) { if (!(error instanceof WorkspaceConflictError)) throw error; stored = await notesDataStore.getWorkspace(user.id); }
+      initialText = old.text;
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    const note = createNoteDocument(initialText);
+    try { stored = await notesDataStore.saveWorkspace(scope, { version: 1, notes: [note], folders: [], activeNoteId: note.id }, Date.now(), null); }
+    catch (error) { if (!(error instanceof WorkspaceConflictError)) throw error; stored = await notesDataStore.getWorkspace(scope); }
   }
   if (nativeMode) { response.setHeader("X-Shiguang-Writable", String(nativeContext.getStore()!.writable)); response.setHeader("X-Shiguang-User", user.id); }
   response.json(
@@ -4912,7 +5031,8 @@ app.post(
     try {
       const body = request.body || {};
       const theme = resolveTheme(body);
-      const renderUrl = getRenderUrl(request, theme, resolveFooterConfig(body));
+      const fontScale = normalizeNoteFontScale(body.fontScale);
+      const renderUrl = getRenderUrl(request, theme, resolveFooterConfig(body), fontScale);
       const markdown = normalizeRenderableImageUrls(
         await resolveMarkdown(body),
         request,
@@ -5078,6 +5198,7 @@ app.post(
         markdown,
         resolveFooterConfig(body),
         theme,
+        normalizeNoteFontScale(body.fontScale),
       );
 
       response.setHeader("Content-Type", "application/zip");
@@ -5107,6 +5228,7 @@ app.post(
       const authenticatedUser = await getWorkspaceUser(request);
       response.json(
         await prepareWechatArticle(markdown, {
+          fontScale: normalizeNoteFontScale(body.fontScale),
           footer: resolveFooterConfig(body),
           publicBaseUrl: getPublicBaseUrl(request),
           temporaryUploads: !authenticatedUser,
@@ -5187,6 +5309,7 @@ app.post(
         markdown,
         resolveFooterConfig(body),
         theme,
+        normalizeNoteFontScale(body.fontScale),
       );
       assertWechatDraftContentLimits(prepared.html);
       recordStage("prepare");
@@ -5330,6 +5453,11 @@ const server = app.listen(nativeMode ? process.env.FNOS_SOCKET! : port, async ()
     await fs.chmod(process.env.FNOS_SOCKET!, 0o660);
     await fs.writeFile(path.join(process.env.TRIM_PKGVAR!, "ready.pid"), String(process.pid), { mode: 0o600 });
     console.log("拾光便签完整应用已启动，使用飞牛统一网关。");
+    console.log(
+      process.env.TRIM_API_TOKEN || (await fs.stat(path.join(process.env.TRIM_PKGVAR!, "api-token")).catch(() => null))
+        ? "[fnos] 系统 API 凭据已就绪：目录授权与 ACL 检查可用。"
+        : "[fnos] 系统 API 凭据未配置：目录列表与 ACL 检查不可用（放 api-token 文件或设置 TRIM_API_TOKEN 后重启）。",
+    );
   } else console.log(`Backend listening on http://127.0.0.1:${port}`);
 });
 

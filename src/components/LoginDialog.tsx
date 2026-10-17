@@ -3,7 +3,14 @@ import { useState, type FormEvent } from "react";
 import type { AuthUser } from "../lib/auth.js";
 
 interface LoginDialogProps {
+  error?: string;
   isAdmin?: boolean;
+  nasLogin?: {
+    isBusy?: boolean;
+    onAuthorize: () => void;
+  };
+  note?: string;
+  title?: string;
   login: (
     username: string,
     password: string,
@@ -14,7 +21,11 @@ interface LoginDialogProps {
 }
 
 export function LoginDialog({
+  error: externalError,
   isAdmin = false,
+  nasLogin,
+  note,
+  title,
   login,
   onAuthenticated,
   onClose,
@@ -74,13 +85,13 @@ export function LoginDialog({
 
         <img
           className="login-dialog-logo"
-          src={appPath("/header/logo.png")}
-          alt=""
+          src={appPath("/brand/shiguang-app-icon.png")}
+          alt="拾光便签"
           width="72"
           height="72"
         />
         <h1 id="login-dialog-title">
-          {isAdmin ? "锤子便签后台" : "锤子便签"}
+          {isAdmin ? `${title ?? "拾光便签"}后台` : (title ?? "拾光便签")}
         </h1>
 
         <div className="login-dialog-tabs" aria-hidden="true">
@@ -142,9 +153,9 @@ export function LoginDialog({
             <span>记住密码</span>
           </label>
 
-          {error ? (
+          {error || externalError ? (
             <p className="login-dialog-error" role="alert">
-              {error}
+              {error || externalError}
             </p>
           ) : null}
 
@@ -157,10 +168,27 @@ export function LoginDialog({
           </button>
         </form>
 
+        {nasLogin ? (
+          <div className="login-dialog-nas">
+            <button
+              type="button"
+              className="login-dialog-nas-button"
+              disabled={nasLogin.isBusy}
+              onClick={nasLogin.onAuthorize}
+            >
+              {nasLogin.isBusy ? "正在授权…" : "使用 NAS 登录"}
+            </button>
+            <p className="login-dialog-nas-hint">
+              从飞牛桌面进入时可用，免密授权，不收集 NAS 密码。
+            </p>
+          </div>
+        ) : null}
+
         <p className="login-dialog-note">
-          {isAdmin
-            ? "管理员凭据由服务端环境变量提供。"
-            : "登录后便签自动保存到云端，并支持跨设备同步。"}
+          {note ??
+            (isAdmin
+              ? "管理员凭据由服务端环境变量提供。"
+              : "登录后便签自动保存到云端，并支持跨设备同步。")}
         </p>
       </section>
     </div>

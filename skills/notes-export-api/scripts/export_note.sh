@@ -71,7 +71,7 @@ Options:
   --markdown-file PATH    UTF-8 markdown file path; local images are auto-uploaded
   --output PATH           Output PNG path
   --filename NAME         Filename sent to API (defaults to output basename)
-  --theme NAME            Optional theme: default or smartisan-dark (defaults to default)
+  --theme NAME            Optional theme: default or dark (defaults to default)
   --footer-brand TEXT     Optional footer brand text, e.g. 由方圆小站发送
   --footer-via TEXT       Optional footer via text, e.g. via Notes API
   --base-url URL          Notes service base URL
@@ -355,10 +355,15 @@ if [[ -z "$FILENAME" ]]; then
 fi
 
 case "$THEME" in
-  default|smartisan-dark)
+  default)
+    ;;
+  dark)
+    THEME="smartisan-dark"
+    ;;
+  smartisan-dark)
     ;;
   *)
-    echo "--theme must be one of: default, smartisan-dark" >&2
+    echo "--theme must be one of: default, dark" >&2
     exit 1
     ;;
 esac

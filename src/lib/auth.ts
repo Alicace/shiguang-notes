@@ -10,6 +10,7 @@ export interface AuthUser {
 }
 
 export interface AuthState {
+  appPassword: boolean;
   requireLogin: boolean;
   user: AuthUser | null;
 }
@@ -71,6 +72,7 @@ async function requestJson<T>(
 
 export async function getAuthState(): Promise<AuthState> {
   const result = await requestJson<{
+    appPassword?: unknown;
     requireLogin?: unknown;
     user: AuthUser | null;
   }>(
@@ -80,6 +82,7 @@ export async function getAuthState(): Promise<AuthState> {
   );
 
   return {
+    appPassword: result.appPassword === true,
     requireLogin: result.requireLogin === true,
     user: result.user,
   };

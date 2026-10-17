@@ -1,10 +1,10 @@
-// DeepSeek Harness 工具插件：把用户对话导出为锤子便签。
+// DeepSeek Harness 工具插件：把用户对话导出为拾光便签。
 // Host 面插件：通过 cordis.patch.yml 的 notes-export 行挂载，向 tools 注册
 // notes_export_conversation 工具。分级模式：
 //   1. 用户配置了自己的便签服务（NOTES_API_BASE_URL + 凭据）→ 把对话作为便签
 //      写入当前账号的云端工作区（新建或按 note_id 更新）。
 //   2. 未配置任何用户信息 → 回退到默认演示服务器 notes.fangyuanxiaozhan.com 的
-//      匿名导出接口，把对话渲染成锤子便签长图 PNG 返回（开箱即用尝鲜，不写入
+//      匿名导出接口，把对话渲染成拾光便签长图 PNG 返回（开箱即用尝鲜，不写入
 //      便签列表）。
 import z from "@deepseek-ai/schemastery";
 import { defineTool } from "@deepseek-ai/dsh-tools";
@@ -45,7 +45,7 @@ export const Config = z.object({
 
 const EXPORT_THEMES = [
   "default",
-  "smartisan-dark",
+  "dark",
   "apple-notes",
   "apple-notes-light",
   "bear",
@@ -53,10 +53,10 @@ const EXPORT_THEMES = [
 ] as const;
 
 const TOOL_DESCRIPTION = [
-  "当用户要求把当前对话、聊天记录或一段内容导出为锤子便签时使用。",
+  "当用户要求把当前对话、聊天记录或一段内容导出为拾光便签时使用。",
   "把对话内容整理成 Markdown 传给 markdown（建议第一行用 # 写标题，便签标题取自正文第一行）。",
   "分级模式：配置了 NOTES_API_BASE_URL（+ NOTES_API_TOKEN 或用户名密码）时，把对话作为便签写入当前账号云端工作区（新建或按 note_id 更新），返回便签链接；",
-  "未配置任何用户信息时，回退到默认演示服务器 notes.fangyuanxiaozhan.com 的匿名导出接口，把对话渲染成锤子便签长图 PNG 返回本地文件路径（尝鲜用，不能写入便签列表）。",
+  "未配置任何用户信息时，回退到默认演示服务器 notes.fangyuanxiaozhan.com 的匿名导出接口，把对话渲染成拾光便签长图 PNG 返回本地文件路径（尝鲜用，不能写入便签列表）。",
   "note_id/folder/starred/pinned 仅在写入模式生效；theme 仅在图片模式生效。",
 ].join(" ");
 

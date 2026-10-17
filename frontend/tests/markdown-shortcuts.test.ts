@@ -151,11 +151,12 @@ test("列表和引用回车自动续行，空项目再次回车退出", () => {
   assert.deepEqual(continueMarkdownBlock("普通正文", 4, 4), null);
 });
 
-test("移动端快速输入栏保持原版五等分、尺寸和键盘联动结构", () => {
+test("移动端快速输入栏保留官方五等分布局，并把高级语法收进更多菜单", () => {
   const editorSource = readFileSync("src/components/EditorPanel.tsx", "utf8");
   const styles = readFileSync("src/styles.css", "utf8");
 
-  for (const label of ["# Title", "[Center]", "- List", "**Bold**", "> Quote"]) {
+  // 与官方移动端一致：这条工具栏直接显示 Markdown 语法本身（中文版文案）。
+  for (const label of ["# 标题", "[ 居中 ]", "- 列表", "**粗体**", "> 引用"]) {
     assert.match(editorSource, new RegExp(`label: "${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
   }
   assert.match(
@@ -164,12 +165,14 @@ test("移动端快速输入栏保持原版五等分、尺寸和键盘联动结�
   );
   assert.match(
     styles,
-    /@media \(max-width: 640px\)[\s\S]*\.markdown-quick-input\s*\{[^}]*height:\s*42\.6667px;[^}]*display:\s*flex;[^}]*flex:\s*0 0 42\.6667px;[^}]*border-top:\s*1px solid #c8d479;/s,
+    /@media \(max-width: 640px\)[\s\S]*\.markdown-quick-input\s*\{[^}]*height:\s*42\.6667px;[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\)\s*32px;[^}]*flex:\s*0 0 42\.6667px;[^}]*border-top:\s*1px solid #c8d479;/s,
   );
   assert.match(
     styles,
-    /\.markdown-quick-input button\s*\{[^}]*width:\s*20%;[^}]*flex:\s*1 1 20%;[^}]*border-right:\s*1px solid #cdd892;[^}]*color:\s*#98ae44;/s,
+    /\.markdown-quick-input > button\s*\{[^}]*width:\s*auto;[^}]*border-right:\s*1px solid #cdd892;[^}]*color:\s*#98ae44;/s,
   );
+  assert.match(editorSource, /className="markdown-quick-more-menu"/);
+  assert.match(styles, /\.markdown-quick-more-menu\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/s);
   assert.match(
     styles,
     /\.app-layout\[data-theme="smartisan-dark"\] \.markdown-quick-input\s*\{[^}]*border-top-color:\s*#3f4d34;[^}]*background:\s*#293025;/s,

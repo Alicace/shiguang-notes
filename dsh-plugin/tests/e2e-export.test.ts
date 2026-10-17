@@ -1,7 +1,7 @@
 // 端到端 feedback：启动真实后端（临时存储目录 + 随机端口 + 临时超级管理员），
 // 验证两种分级模式：
 //   1. 配置了服务：用 NotesClient 走完 申请 token → 导出对话写入便签 → 更新便签。
-//   2. 未配置：匿名导出接口把对话渲染成锤子便签 PNG，并落盘为本地文件。
+//   2. 未配置：匿名导出接口把对话渲染成拾光便签 PNG，并落盘为本地文件。
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";

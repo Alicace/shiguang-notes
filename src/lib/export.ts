@@ -15,6 +15,7 @@ interface ExportFooterOptions {
   footerBrand: string;
   footerLogoUrl: string;
   footerVia: string;
+  fontScale?: number;
 }
 
 interface WorkspaceArchiveJobPayload {
@@ -201,6 +202,7 @@ async function tryServerExport(
         },
         body: JSON.stringify({
           filename,
+          fontScale: footer.fontScale ?? 1,
           footerBrand: footer.footerBrand,
           footerLogoUrl: footer.footerLogoUrl,
           footerVia: footer.footerVia,
@@ -276,6 +278,7 @@ export async function exportMarkdownArchive(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
+      fontScale: footer.fontScale ?? 1,
       footerBrand: footer.footerBrand,
       footerLogoUrl: footer.footerLogoUrl,
       footerVia: footer.footerVia,
@@ -325,7 +328,7 @@ async function downloadWorkspaceArchive(
 
   const filename = getFilenameFromContentDisposition(
     response.headers.get("content-disposition"),
-    job.filename || "smartisan-notes.zip",
+    job.filename || "shiguang-notes.zip",
   );
   const contentLength = Number(response.headers.get("content-length") || "0");
 

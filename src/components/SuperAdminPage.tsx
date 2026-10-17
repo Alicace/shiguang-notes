@@ -177,7 +177,7 @@ export function SuperAdminPage() {
       <header className="superadmin-header">
         <div>
           <span className="superadmin-eyebrow">SUPERADMIN</span>
-          <h1>锤子便签用户管理</h1>
+          <h1>拾光便签用户管理</h1>
         </div>
         <div className="superadmin-session">
           <span>{session.username}</span>

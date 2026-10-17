@@ -2,7 +2,7 @@
   {
     "stepTitle": "应用数据处理",
     "items": [
-      { "type": "tips", "helpText": "卸载前请导出备份。默认脚本不主动清理数据；系统卸载是否保留仍需在真机确认。选择删除会清理本应用的正文、图片、共享权限和服务配置。" },
+      { "type": "tips", "helpText": "卸载前请先在应用内导出备份。默认不主动清理数据。选择删除会一并清理拾光便签的正文、图片、共享权限和服务配置。" },
       { "type": "select", "field": "wizard_m0_data", "label": "应用脚本如何处理数据", "initValue": "keep", "options": [
         { "label": "不主动清理", "value": "keep" },
         { "label": "删除拾光便签应用数据", "value": "delete" }

@@ -1,4 +1,20 @@
+拾光便签 / Shiguang Notes
+Copyright 2026 Shiguang Notes contributors
+
+This product is a modified derivative of the open-source project "notes":
+
 notes
 Copyright 2026 zhaoolee and contributors
-
 https://github.com/zhaoolee/notes
+Imported upstream snapshot: 6a9b6a3f02a3dd189117bd511d840e44e0c665d5
+
+The fnOS packaging, account and tenant model, shared spaces, file authorization,
+rich-text editor, native settings, branding and update workflow contain
+modifications made by the Shiguang Notes project. Files changed for this
+derivative include the application source, fnOS package, documentation and
+brand assets listed in the repository history.
+
+Redistributors must preserve this NOTICE, the Apache License 2.0 text and the
+upstream attribution. Third-party themes, fonts, images, names and trademarks
+remain subject to their respective owners' terms and are not relicensed by the
+Apache License 2.0.

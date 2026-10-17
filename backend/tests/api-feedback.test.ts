@@ -543,7 +543,7 @@ test("Express 提供健康检查和内容寻址图片存储", async (context) =>
       ),
     ) as { deleteAfterDays?: number };
     assert.equal(uploadPolicy.deleteAfterDays, 1);
-    assert.match(wechat.html, /data-tool="开源版锤子便签"/);
+    assert.match(wechat.html, /data-tool="拾光便签"/);
     assert.match(wechat.html, /data-note-card-theme="default"/);
     assert.match(wechat.html, /data-smartisan-theme="default"/);
     assert.match(
@@ -649,11 +649,11 @@ test("Express 提供健康检查和内容寻址图片存储", async (context) =>
     );
     assert.doesNotMatch(wechat.html, /<footer(?:\s|>)/);
     assert.doesNotMatch(wechat.html, /<table data-smartisan-footer="true"/);
-    assert.match(wechat.html, /data-smartisan-hammer="true"/);
+    assert.match(wechat.html, /data-note-logotype="true"/);
     assert.match(
       wechat.html,
       new RegExp(
-        `data-smartisan-hammer="true"[^>]*src="${qiniuImageUrl.replace(/\./g, "\\.")}"`,
+        `data-note-logotype="true"[^>]*src="${qiniuImageUrl.replace(/\./g, "\\.")}"`,
       ),
     );
     assert.doesNotMatch(
@@ -662,7 +662,7 @@ test("Express 提供健康检查和内容寻址图片存储", async (context) =>
     );
     assert.match(
       wechat.html,
-      /data-smartisan-hammer="true"[^>]*border-radius:50%;background-color:transparent;object-fit:contain/,
+      /data-note-logotype="true"[^>]*border-radius:50%;background-color:transparent;object-fit:contain/,
     );
     assert.doesNotMatch(wechat.html, /src="data:/);
     assert.doesNotMatch(wechat.html, /<link\b[^>]*rel="preload"/);
@@ -681,6 +681,12 @@ test("Express 提供健康检查和内容寻址图片存储", async (context) =>
     assert.match(bearWechat.html, /data-note-card-theme="bear"/);
     assert.match(bearWechat.html, /background-color:#ffffff/);
     assert.match(bearWechat.html, /color:#dd4c4f/);
+    // 默认页脚标志是随包图片，公众号复制只能拿到公网外链，因此这里输出纯文字页脚，
+    // 不会因为缺少七牛配置而报错；草稿提交（/api/wechat/draft）仍会把随包标志上传给微信。
+    assert.doesNotMatch(bearWechat.html, /data-note-logotype="true"[^>]*src="/);
+    assert.match(bearWechat.html, /data-smartisan-footer="true"/);
+    assert.doesNotMatch(bearWechat.html, /src="\/brand\//);
+    assert.doesNotMatch(bearWechat.html, /src="data:/);
     assert.match(bearWechat.html, />▎<\/span>Bear 引用/);
     assert.match(
       bearWechat.html,

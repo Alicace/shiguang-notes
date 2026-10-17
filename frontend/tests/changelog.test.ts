@@ -11,7 +11,7 @@ const packageVersion = JSON.parse(
   readFileSync("package.json", "utf8"),
 ) as { version: string };
 
-test("CHANGELOG 使用固定的人类可读格式记录未发布与正式版本", () => {
+test("CHANGELOG 使用固定的人类可读格式记录版本", () => {
   const secondLevelHeadings = Array.from(
     changelog.matchAll(/^##\s+(.+)$/gm),
     (match) => match[1],
@@ -29,12 +29,13 @@ test("CHANGELOG 使用固定的人类可读格式记录未发布与正式版本"
     "安全",
   ]);
   const hasUnreleasedSection = secondLevelHeadings[0] === "[未发布]";
-  const latestReleaseIndex = hasUnreleasedSection ? 1 : 0;
-
   assert.match(changelog, /^# 更新日志\n/);
   assert.equal(
-    secondLevelHeadings[latestReleaseIndex],
-    `[${packageVersion.version}] - 2026-10-11`,
+    secondLevelHeadings[hasUnreleasedSection ? 1 : 0],
+    "[0.9.0] - 2026-10-17",
+  );
+  assert.ok(
+    secondLevelHeadings.includes(`[${packageVersion.version}] - 2026-10-11`),
   );
   assert.ok(categoryHeadings.length > 0);
 
@@ -153,6 +154,16 @@ test("changelog 解析器保留便签分节并解析版本比较链接", () => {
     content: RegExp[];
   }> = [
     {
+      version: "0.9.0",
+      heading:
+        "[0.9.0](https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.0) - 2026-10-17",
+      content: [
+        /登录页.*自绘.*旧品牌.*暖色杂志/s,
+        /静态 `version\.json`.*不调用 GitHub API.*SHA-256.*安装器.*GitHub Release/s,
+        /关于.*上游来源.*Apache-2\.0/s,
+      ],
+    },
+    {
       version: "1.12.0",
       heading:
         "[1.12.0](https://github.com/zhaoolee/notes/compare/1.11.2...1.12.0) - 2026-10-11",
@@ -219,7 +230,7 @@ test("changelog 解析器保留便签分节并解析版本比较链接", () => {
       version: "1.10.2",
       heading:
         "[1.10.2](https://github.com/zhaoolee/notes/compare/1.10.1...1.10.2) - 2026-09-12",
-      content: [/锤子明暗主题.*双线纸框.*装饰表格.*虚线.*额外表格边框/s],
+      content: [/拾光明暗主题.*双线纸框.*装饰表格.*虚线.*额外表格边框/s],
     },
     {
       version: "1.10.1",
@@ -238,7 +249,7 @@ test("changelog 解析器保留便签分节并解析版本比较链接", () => {
       heading:
         "[1.9.1](https://github.com/zhaoolee/notes/compare/1.9.0...1.9.1) - 2026-08-24",
       content: [
-        /老罗巴扎嘿.*OPPO Sans.*PNG.*文泉驿正黑.*Liberation Sans.*网页预览.*离线归档.*微信公众号富文本/s,
+        /暖色杂志.*OPPO Sans.*PNG.*文泉驿正黑.*Liberation Sans.*网页预览.*离线归档.*微信公众号富文本/s,
       ],
     },
     {
@@ -246,7 +257,7 @@ test("changelog 解析器保留便签分节并解析版本比较链接", () => {
       heading:
         "[1.9.0](https://github.com/zhaoolee/notes/compare/1.8.4...1.9.0) - 2026-08-24",
       content: [
-        /老罗巴扎嘿.*Bear 便签.*editing-skill.*网页预览.*保存图片.*离线归档.*微信公众号富文本/s,
+        /暖色杂志.*Bear 便签.*editing-skill.*网页预览.*保存图片.*离线归档.*微信公众号富文本/s,
       ],
     },
     {
@@ -393,7 +404,7 @@ test("changelog 解析器保留便签分节并解析版本比较链接", () => {
   }
 });
 
-test("changelog 独立页面复用锤子便签预览结构", () => {
+test("changelog 独立页面复用拾光便签预览结构", () => {
   const html = renderToStaticMarkup(
     createElement(ChangelogPage, { markdown: changelog }),
   );
@@ -406,7 +417,7 @@ test("changelog 独立页面复用锤子便签预览结构", () => {
   assert.match(html, />更新日志</);
   assert.match(html, />新增</);
   assert.match(html, /href="https:\/\/github\.com\/zhaoolee\/notes\/compare\/1\.3\.0\.\.\.1\.3\.1"/);
-  assert.match(html, /href="\/" aria-label="返回锤子便签"/);
+  assert.match(html, /href="\/" aria-label="返回拾光便签"/);
 });
 
 test("前端入口和生产镜像都包含 changelog 页面所需文件", () => {

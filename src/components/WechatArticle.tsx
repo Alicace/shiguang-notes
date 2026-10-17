@@ -13,6 +13,7 @@ import {
   MARKDOWN_LIST_ITEM_PATTERN,
   splitSections,
 } from "../lib/markdown.js";
+import { normalizeNoteFontScale } from "../lib/note-typography.js";
 import {
   getNoteCardThemeStyle,
   type NoteCardThemeColors,
@@ -26,9 +27,11 @@ import type { NoteCardThemeId, NoteSection } from "../types/app.js";
 import { remarkManualLineParagraphs } from "./MarkdownText.js";
 
 interface WechatArticleProps {
+  fontScale?: number;
   footerBrand: string;
   markdown: string;
-  footerHammerUrl: string;
+  // 公众号页脚标志需要公网可达的图片；留空时只输出文字页脚。
+  footerHammerUrl?: string;
   footerVia: string;
   theme: NoteCardThemeId;
 }
@@ -144,6 +147,7 @@ function readWechatListGap(properties: unknown): number {
 
 interface WechatRenderContext {
   baseHeadingStyle: CSSProperties;
+  fontScale: number;
   blankParagraphStyle: CSSProperties;
   bodyFontSize: string;
   bodyFontSizePx: number;
@@ -157,13 +161,15 @@ interface WechatRenderContext {
 
 function createWechatRenderContext(
   theme: NoteCardThemeId,
+  fontScale = 1,
 ): WechatRenderContext {
   const themeStyle = getNoteCardThemeStyle(theme);
   const { colors } = themeStyle;
   const isBear = themeStyle.layout === "bear";
   const isBazhahei = themeStyle.layout === "bazhahei";
   const isTelegraph = themeStyle.layout === "telegraph";
-  const bodyFontSizePx = isTelegraph ? 18 : 15;
+  /* 便签字号档位（官方移动端 A+/A- 的等价物）：整篇字号一起缩放。 */
+  const bodyFontSizePx = (isTelegraph ? 18 : 15) * fontScale;
   const bodyFontSize = `${bodyFontSizePx}px`;
   const bodyLineHeight = isTelegraph ? 1.58 : isBear ? 1.755 : isBazhahei ? 1.8 : 1.75;
   const blankLineHeight = `${Number((bodyFontSizePx * bodyLineHeight).toFixed(2))}px`;
@@ -184,6 +190,7 @@ function createWechatRenderContext(
 
   return {
     colors,
+    fontScale,
     themeStyle,
     blankParagraphStyle: {
       margin: "0",
@@ -297,6 +304,7 @@ function createMarkdownComponents(
     bodyLineHeight,
     bodyParagraphStyle,
     colors,
+    fontScale,
     headingLineHeightRatio,
     themeStyle,
   } = context;
@@ -304,12 +312,12 @@ function createMarkdownComponents(
   const isBazhahei = themeStyle.layout === "bazhahei";
   const isTelegraph = themeStyle.layout === "telegraph";
   const headingRatio = isTelegraph ? 1.1 : headingLineHeightRatio;
-  const h1FontSizePx = isTelegraph ? 32 : isBazhahei ? 30 : 22;
-  const h2FontSizePx = isTelegraph ? 24 : isBazhahei ? 20 : 17;
-  const h3FontSizePx = isTelegraph ? 28 : isBazhahei ? 17 : 16;
-  const h4FontSizePx = isTelegraph ? 24 : 15;
-  const h5FontSizePx = isTelegraph ? 24 : 14;
-  const h6FontSizePx = isTelegraph ? 24 : 13;
+  const h1FontSizePx = (isTelegraph ? 32 : isBazhahei ? 30 : 22) * fontScale;
+  const h2FontSizePx = (isTelegraph ? 24 : isBazhahei ? 20 : 17) * fontScale;
+  const h3FontSizePx = (isTelegraph ? 28 : isBazhahei ? 17 : 16) * fontScale;
+  const h4FontSizePx = (isTelegraph ? 24 : 15) * fontScale;
+  const h5FontSizePx = (isTelegraph ? 24 : 14) * fontScale;
+  const h6FontSizePx = (isTelegraph ? 24 : 13) * fontScale;
   const tableFontSizePx = 14;
   const tableLineHeight = pxLineHeight(tableFontSizePx, 1.52);
   const codeBlockFontSizePx = isTelegraph ? 16 : 13;
@@ -407,7 +415,7 @@ function createMarkdownComponents(
       {children}
     </h6>
   ),
-  p: ({ children, style }) => {
+  p: ({ children, className, style }) => {
     const isBlankLine = Array.isArray(children)
       ? children.length === 1 && children[0] === MARKDOWN_BLANK_LINE
       : children === MARKDOWN_BLANK_LINE;
@@ -420,7 +428,22 @@ function createMarkdownComponents(
       );
     }
 
-    return <p style={{ ...bodyParagraphStyle, ...style }}>{children}</p>;
+    // 官方用一对中括号表示居中一段文字；公众号导出必须写成内联样式才会被微信保留。
+    const isCenteredLine =
+      typeof className === "string" &&
+      className.split(/\s+/).includes("markdown-centered-line");
+
+    return (
+      <p
+        style={{
+          ...bodyParagraphStyle,
+          ...(isCenteredLine ? { textAlign: "center" as const } : {}),
+          ...style,
+        }}
+      >
+        {children}
+      </p>
+    );
   },
   strong: ({ children }) => (
     <strong
@@ -433,6 +456,10 @@ function createMarkdownComponents(
     </strong>
   ),
   em: ({ children }) => <em>{children}</em>,
+  // 下划线在微信里必须写成内联样式，<u> 标签不保证保留。
+  u: ({ children }) => (
+    <span style={{ textDecoration: "underline" }}>{children}</span>
+  ),
   a: ({ children, href }) => (
     <a
       href={href}
@@ -774,10 +801,11 @@ function SectionHeading({
   components: Components;
   context: WechatRenderContext;
 }) {
-  const { baseHeadingStyle, themeStyle } = context;
+  const { baseHeadingStyle, fontScale, themeStyle } = context;
   const isBazhahei = themeStyle.layout === "bazhahei";
   const isTelegraph = themeStyle.layout === "telegraph";
-  const sectionHeadingFontSizePx = isTelegraph ? 28 : isBazhahei ? 20 : 17;
+  const sectionHeadingFontSizePx =
+    (isTelegraph ? 28 : isBazhahei ? 20 : 17) * fontScale;
   const sectionHeadingLineHeightRatio =
     themeStyle.layout === "bear"
       ? 1.521
@@ -1054,13 +1082,14 @@ function WechatArticleContent({
 }
 
 export function WechatArticle({
+  fontScale = 1,
   footerBrand,
   markdown,
   footerHammerUrl,
   footerVia,
   theme,
 }: WechatArticleProps) {
-  const context = createWechatRenderContext(theme);
+  const context = createWechatRenderContext(theme, normalizeNoteFontScale(fontScale));
   const {
     bodyFontSize,
     bodyFontSizePx,
@@ -1080,7 +1109,7 @@ export function WechatArticle({
 
   return (
     <section
-      data-tool="开源版锤子便签"
+      data-tool="拾光便签"
       data-note-card-theme={theme}
       data-smartisan-theme={theme}
       style={{
@@ -1183,26 +1212,28 @@ export function WechatArticle({
               : {}),
           }}
         >
-          <img
-            data-smartisan-hammer="true"
-            src={footerHammerUrl}
-            alt="锤子"
-            width="20"
-            height="20"
-            style={{
-              display: "inline-block",
-              width: scaledRem(0.64),
-              height: scaledRem(0.64),
-              margin: `0 ${scaledPx(6)} 0 0`,
-              border: "0",
-              borderRadius: "50%",
-              backgroundColor: "transparent",
-              objectFit: "contain",
-              filter: themeStyle.footerLogoFilter,
-              opacity: themeStyle.footerLogoOpacity,
-              verticalAlign: "middle",
-            }}
-          />
+          {footerHammerUrl ? (
+            <img
+              data-note-logotype="true"
+              src={footerHammerUrl}
+              alt="拾光便签"
+              width="20"
+              height="20"
+              style={{
+                display: "inline-block",
+                width: scaledRem(0.64),
+                height: scaledRem(0.64),
+                margin: `0 ${scaledPx(6)} 0 0`,
+                border: "0",
+                borderRadius: "50%",
+                backgroundColor: "transparent",
+                objectFit: "contain",
+                filter: themeStyle.footerLogoFilter,
+                opacity: themeStyle.footerLogoOpacity,
+                verticalAlign: "middle",
+              }}
+            />
+          ) : null}
           <span
             style={{
               display: "inline-block",

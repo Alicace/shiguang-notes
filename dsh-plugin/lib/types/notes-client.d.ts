@@ -60,7 +60,7 @@ export declare class NotesClient {
      */
     exportNote(input: ExportNoteInput, signal?: AbortSignal): Promise<ExportResult>;
     /**
-     * 通过匿名导出接口把 Markdown 渲染为锤子便签长图 PNG（无需登录）。
+     * 通过匿名导出接口把 Markdown 渲染为拾光便签长图 PNG（无需登录）。
      * 返回 PNG 字节与服务器上的公开 URL（X-Export-Url 响应头）。
      */
     exportImage(input: ExportImageInput, signal?: AbortSignal): Promise<ImageExportResult>;

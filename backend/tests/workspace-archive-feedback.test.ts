@@ -250,7 +250,7 @@ test("整体导出保留目录、Markdown、相关图片和真实任务进度", 
     assert.equal(downloadResponse.headers.get("content-type"), "application/zip");
     assert.match(
       downloadResponse.headers.get("content-disposition") || "",
-      /smartisan-notes-\d{4}-\d{2}-\d{2}/,
+      /shiguang-notes-\d{4}-\d{2}-\d{2}/,
     );
     const entries = readZipEntries(
       Buffer.from(await downloadResponse.arrayBuffer()),

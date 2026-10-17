@@ -1,4 +1,14 @@
-export type MarkdownShortcut = "title" | "center" | "list" | "bold" | "quote";
+export type MarkdownShortcut =
+  | "title"
+  | "center"
+  | "list"
+  | "todo"
+  | "bold"
+  | "quote"
+  | "strike"
+  | "code"
+  | "hr"
+  | "clear";
 
 export interface MarkdownEditResult {
   markdown: string;
@@ -139,6 +149,33 @@ function centerLine(
   };
 }
 
+// 待办在当前行前缀之间循环：无 → - [ ] → - [x] → 无，与官方复选框行为一致。
+function cycleTaskPrefix(
+  markdown: string,
+  selectionStart: number,
+  selectionEnd: number,
+): MarkdownEditResult {
+  const selection = normalizeSelection(markdown, selectionStart, selectionEnd);
+  const line = getLineRange(markdown, selection.start);
+  const current = line.text.match(/^([-+*])\s+\[([ xX])\]\s+/);
+  const next = current
+    ? current[2].toLowerCase() === "x"
+      ? ""
+      : "- [x] "
+    : "- [ ] ";
+  const delta = next.length - (current?.[0].length ?? 0);
+  const mapOffset = (offset: number): number =>
+    offset <= line.start + (current?.[0].length ?? 0)
+      ? line.start + next.length
+      : offset + delta;
+
+  return {
+    markdown: replaceLine(markdown, line, `${next}${line.text.slice(current?.[0].length ?? 0)}`),
+    selectionStart: mapOffset(selection.start),
+    selectionEnd: mapOffset(selection.end),
+  };
+}
+
 function boldSelection(
   markdown: string,
   selectionStart: number,
@@ -167,6 +204,31 @@ function boldSelection(
   };
 }
 
+
+function wrapSelection(markdown: string, selectionStart: number, selectionEnd: number, marker: string): MarkdownEditResult {
+  const selection = normalizeSelection(markdown, selectionStart, selectionEnd);
+  const selectedText = markdown.slice(selection.start, selection.end);
+  if (!selectedText) {
+    return { markdown: `${markdown.slice(0, selection.start)}${marker}${marker}${markdown.slice(selection.end)}`, selectionStart: selection.start + marker.length, selectionEnd: selection.start + marker.length };
+  }
+  const before = markdown.slice(Math.max(0, selection.start - marker.length), selection.start);
+  const after = markdown.slice(selection.end, selection.end + marker.length);
+  if (before === marker && after === marker) {
+    return { markdown: `${markdown.slice(0, selection.start - marker.length)}${selectedText}${markdown.slice(selection.end + marker.length)}`, selectionStart: selection.start - marker.length, selectionEnd: selection.end - marker.length };
+  }
+  return { markdown: `${markdown.slice(0, selection.start)}${marker}${selectedText}${marker}${markdown.slice(selection.end)}`, selectionStart: selection.start + marker.length, selectionEnd: selection.end + marker.length };
+}
+
+function clearFormatting(markdown: string, selectionStart: number, selectionEnd: number): MarkdownEditResult {
+  const selection = normalizeSelection(markdown, selectionStart, selectionEnd);
+  const text = markdown.slice(selection.start, selection.end).replace(/(\*\*|__|~~|\+\+|`)/g, "");
+  const line = getLineRange(markdown, selection.start);
+  const lineText = line.text.replace(/^(#{1,6} |[-+*] |\d+[.)] |[-+*] \[([ xX])\] |^> ?)/, "");
+  const next = replaceLine(markdown, line, lineText);
+  const delta = line.text.length - lineText.length;
+  return { markdown: next.slice(0, selection.start) + text + next.slice(selection.end), selectionStart: Math.max(line.start, selection.start - delta), selectionEnd: Math.max(line.start, selection.end - delta) };
+}
+
 export function applyMarkdownShortcut(
   markdown: string,
   selectionStart: number,
@@ -180,10 +242,22 @@ export function applyMarkdownShortcut(
       return centerLine(markdown, selectionStart, selectionEnd);
     case "list":
       return addLinePrefix(markdown, selectionStart, selectionEnd, "- ");
+    case "todo":
+      return cycleTaskPrefix(markdown, selectionStart, selectionEnd);
     case "bold":
       return boldSelection(markdown, selectionStart, selectionEnd);
     case "quote":
       return addLinePrefix(markdown, selectionStart, selectionEnd, "> ");
+    case "strike":
+      return wrapSelection(markdown, selectionStart, selectionEnd, "~~");
+    case "code":
+      return wrapSelection(markdown, selectionStart, selectionEnd, "`");
+    case "hr": {
+      const line = getLineRange(markdown, selectionStart);
+      return { markdown: replaceLine(markdown, line, "---"), selectionStart: line.start + 3, selectionEnd: line.start + 3 };
+    }
+    case "clear":
+      return clearFormatting(markdown, selectionStart, selectionEnd);
   }
 }
 

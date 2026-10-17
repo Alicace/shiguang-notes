@@ -13,6 +13,23 @@ import { ConfirmDialog } from "./components/ConfirmDialog";
 import { EditorPanel, type EditorPanelHandle } from "./components/EditorPanel";
 import { LoginDialog } from "./components/LoginDialog";
 import { MoveNoteDialog } from "./components/MoveNoteDialog";
+import { NoteCardThemePicker } from "./components/NoteCardThemePicker";
+import {
+  RichTextEditor,
+  type RichTextEditorHandle,
+} from "./components/RichTextEditor";
+import {
+  EMPTY_RICH_TOOLBAR_STATE,
+  RichTextToolbar,
+  type RichToolbarState,
+} from "./components/RichTextToolbar";
+import { useMediaQuery } from "./lib/use-media-query";
+import {
+  canStepNoteFontScale,
+  getNoteFontScaleLabel,
+  normalizeNoteFontScale,
+  stepNoteFontScale,
+} from "./lib/note-typography";
 import { NoteSidebar } from "./components/NoteSidebar";
 import { PreviewPanel } from "./components/PreviewPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
@@ -40,6 +57,7 @@ import {
   downloadHermesSkillPackage,
   getHermesSkillInstallLink,
   getAuthState,
+  getAuthSession,
   getCloudWorkspace,
   loginUser,
   logoutUser,
@@ -48,6 +66,7 @@ import {
   type AuthUser,
 } from "./lib/auth";
 import { copyTextToClipboard, normalizeClipboardMarkdown } from "./lib/clipboard";
+import { importNasImage } from "./lib/images";
 import {
   exportMarkdownArchive,
   exportMarkdownAsPng,
@@ -82,18 +101,26 @@ import {
   publishMarkdownAsWechatDraft,
 } from "./lib/wechat";
 import { useAppStore } from "./store/useAppStore";
+import type { CSSProperties } from "react";
 import type {
   CopyState,
+  FormattingMode,
   NoteCardThemeId,
   NoteCategoryId,
   NoteFolder,
   NoteWorkspace,
 } from "./types/app";
 import { appPath, isNative, nativeWritable } from "./lib/fnos-client";
+import {
+  forgetNativeLoginConsent,
+  hasNativeLoginConsent,
+  rememberNativeLoginConsent,
+  shouldAutoUseNasLogin,
+} from "./lib/native-login";
+import { nativeJson } from "./native/api";
 import { collectPageEvents, recorder } from "../fnos/m0/ui/diagnostics";
 import nativeMetadata from "./native/metadata.json";
 import { featureInventory } from "./native/features";
-import { resetNativeTestResults } from "./native/NativeSettings";
 
 type MobileWorkspaceView = "notes" | "editor" | "preview";
 type DesktopWorkspaceView = "editor" | "preview";
@@ -120,6 +147,49 @@ const HERMES_SKILL_LINK_RESET_CONFIRMATION = {
     "重置后，当前专属链接会立即失效，之后无法再用于下载；已经安装的 Skill 不受影响。",
   confirmLabel: "确认重置",
 };
+
+const NATIVE_NAS_AUTH_CONFIRMATION = {
+  title: "使用 NAS 账号登录？",
+  description:
+    "拾光便签会读取当前飞牛登录态作为账号，不读取也不保存 NAS 密码。确认后即可进入应用。",
+  confirmLabel: "授权",
+};
+
+// 对齐官方 formatting_mode 的名称：0 无 / 1 富文本模式 / 2 Markdown 模式。
+const FORMATTING_MODE_LABELS: Record<FormattingMode, string> = {
+  // 与官方一致：0 号模式叫「无」，另外两档沿用官方名称。
+  plain: "无",
+  rich: "富文本模式",
+  markdown: "Markdown 模式",
+};
+
+const FORMATTING_MODE_OPTIONS: Array<{
+  id: FormattingMode;
+  label: string;
+}> = [
+  { id: "plain", label: "无" },
+  { id: "rich", label: "富文本模式" },
+  { id: "markdown", label: "Markdown 模式" },
+];
+
+// 官方排版模式选单里每一档都带一个小标识（RTF / M↓），状态栏里也常驻显示当前档位。
+function FormatModeBadge({ mode }: { mode: FormattingMode }) {
+  if (mode === "plain") {
+    return (
+      <span className="format-mode-badge" aria-hidden="true">
+        <svg viewBox="0 0 16 16">
+          <path d="M3 4.5h10M3 8h10M3 11.5h6" />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className={`format-mode-badge is-${mode}`} aria-hidden="true">
+      {mode === "rich" ? "RTF" : "M↓"}
+    </span>
+  );
+}
 
 function getCurrentWorkspace(): NoteWorkspace {
   const state = useAppStore.getState();
@@ -238,7 +308,7 @@ export default function App() {
   const renderMode = getRenderMode();
   const isPlaywrightRender = !isNative && renderMode === "playwright";
   const isTestDataMode = isSmartisanWebTestDataMode();
-  const [footerBrand, setFooterBrand] = useState(() => isNative && getInitialFooterBrand() === "由开源版锤子便签发送" ? "由拾光便签发送" : getInitialFooterBrand());
+  const [footerBrand, setFooterBrand] = useState(getInitialFooterBrand);
   const [footerLogoUrl, setFooterLogoUrl] = useState(() => appPath(getInitialFooterLogoUrl()));
   const [footerVia, setFooterVia] = useState(getInitialFooterVia);
   const [aiEnabled, setAiEnabled] = useState(getInitialAiEnabled);
@@ -251,12 +321,14 @@ export default function App() {
     useState<WorkspaceArchiveProgress | null>(null);
   const [workspaceArchiveError, setWorkspaceArchiveError] = useState("");
   const [isImportingImage, setIsImportingImage] = useState(false);
+  const [isImageSourceMenuOpen, setIsImageSourceMenuOpen] = useState(false);
   const [isRefreshingNotes, setIsRefreshingNotes] = useState(false);
   const [isNoteSidebarOpen, setIsNoteSidebarOpen] = useState(false);
   const [isCategorySidebarOpen, setIsCategorySidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
-  const [isDesktopViewMenuOpen, setIsDesktopViewMenuOpen] = useState(false);
+  const [isFormattingModeMenuOpen, setIsFormattingModeMenuOpen] =
+    useState(false);
   const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
   const [isDesktopCategoryCollapsed, setIsDesktopCategoryCollapsed] =
     useState(false);
@@ -264,6 +336,14 @@ export default function App() {
   const [isDesktopSharePreview, setIsDesktopSharePreview] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [requireLogin, setRequireLogin] = useState(isNative);
+  const [isNativeLoggedIn, setIsNativeLoggedIn] = useState(
+    () => !isNative || hasNativeLoginConsent(),
+  );
+  const [hasNativeAppPassword, setHasNativeAppPassword] = useState(false);
+  const [isNasAuthorizing, setIsNasAuthorizing] = useState(false);
+  const [isNasAuthConfirmationOpen, setIsNasAuthConfirmationOpen] =
+    useState(false);
+  const [nativeLoginError, setNativeLoginError] = useState("");
   const [nativeReadOnly, setNativeReadOnly] = useState(false);
   const [nativeSwitching, setNativeSwitching] = useState(false);
   const cloudFailureRef = useRef(false);
@@ -304,13 +384,20 @@ export default function App() {
           : parseNoteRouteHash(window.location.hash),
     }));
   const editorPanelRef = useRef<EditorPanelHandle | null>(null);
+  const richEditorRef = useRef<RichTextEditorHandle | null>(null);
+  const [richToolbarState, setRichToolbarState] = useState<RichToolbarState>(
+    EMPTY_RICH_TOOLBAR_STATE,
+  );
+  const isMobileLayout = useMediaQuery("(max-width: 640px)");
   const refreshTimeoutRef = useRef<number | null>(null);
   const settingsContainerRef = useRef<HTMLDivElement | null>(null);
   const desktopSettingsContainerRef = useRef<HTMLButtonElement | null>(null);
   const settingsPanelHostRef = useRef<HTMLDivElement | null>(null);
   const shareContainerRef = useRef<HTMLDivElement | null>(null);
   const accountContainerRef = useRef<HTMLDivElement | null>(null);
-  const desktopViewMenuRef = useRef<HTMLDivElement | null>(null);
+  const formattingModeMenuRef = useRef<HTMLDivElement | null>(null);
+  const mobileFormattingModeMenuRef = useRef<HTMLDivElement | null>(null);
+  const insertImageMenuRef = useRef<HTMLDivElement | null>(null);
   const desktopViewBeforeShareRef = useRef<DesktopWorkspaceView>("editor");
   const mobileDraftNoteIdRef = useRef<string | null>(null);
   const cloudSaveTimeoutRef = useRef<number | null>(null);
@@ -356,6 +443,11 @@ export default function App() {
   const folders = useAppStore((state) => state.folders);
   const noteDocuments = useAppStore((state) => state.notes);
   const markdown = useAppStore((state) => state.markdown);
+  const richText = useAppStore((state) => state.richText);
+  const setFormattingMode = useAppStore((state) => state.setFormattingMode);
+  const setRichText = useAppStore((state) => state.setRichText);
+  const setRichStyles = useAppStore((state) => state.setRichStyles);
+  const setNoteFontScale = useAppStore((state) => state.setNoteFontScale);
   const selectedTheme = useAppStore((state) => state.selectedTheme);
   const resolvedTheme = useResolvedTheme(selectedTheme);
   const [noteCardThemeOverride, setNoteCardThemeOverride] =
@@ -424,6 +516,16 @@ export default function App() {
   const hasActiveCategoryNote = Boolean(activeCategoryNote);
   const notes = splitSections(markdown);
   const activeNote = noteDocuments.find((note) => note.id === activeNoteId);
+  const formattingMode = activeNote?.formattingMode ?? "markdown";
+  const isRichMode = formattingMode === "rich";
+  const richContent = isRichMode ? richText : null;
+  const editorText = isRichMode ? richContent?.text ?? "" : markdown;
+  // 服务端渲染导出页（renderMode=playwright）通过查询参数传入便签字号档位。
+  const noteFontScale = isPlaywrightRender
+    ? normalizeNoteFontScale(
+        Number(new URLSearchParams(location.search).get("fontScale") ?? 1),
+      )
+    : normalizeNoteFontScale(activeNote?.fontScale);
   const mobileNoteCharacterCount = activeCategoryNote
     ? markdown.replace(/\s/g, "").length
     : 0;
@@ -488,44 +590,25 @@ export default function App() {
     let cancelled = false;
 
     void (async () => {
+      let session: AuthUser | null;
+
       try {
         const authState = await getAuthState();
-        const session = authState.user;
+        session = authState.user;
 
         if (cancelled) {
           return;
         }
 
         setRequireLogin(authState.requireLogin);
-
-        if (canUseCloudWorkspace(session)) {
-          setCloudSyncState("syncing");
-          const cloud = await getCloudWorkspace();
-
-          if (cancelled) {
-            return;
-          }
-
-          if (cloud.workspace) {
-            skipNextCloudSaveRef.current = true;
-            replaceWorkspace(cloud.workspace);
-            cloudRevisionRef.current = cloud.updatedAt ?? 0;
-          } else {
-            const saved = await saveCloudWorkspace(getCurrentWorkspace());
-
-            if (cancelled) {
-              return;
-            }
-
-            cloudRevisionRef.current = saved.updatedAt ?? 0;
-            skipNextCloudSaveRef.current = true;
-          }
-
-          cloudHydratedUserIdRef.current = session.id;
-          setCloudSyncState("synced");
-        }
-
+        setHasNativeAppPassword(authState.appPassword);
         setAuthUser(session);
+        // 飞牛网关已经确认当前用户时，不需要每次重开都再点一次“使用 NAS 登录”。
+        // localStorage 可能被 WebView 清理，自动登记一次并直接继续使用服务端会话。
+        if (isNative && session && shouldAutoUseNasLogin()) {
+          rememberNativeLoginConsent();
+          setIsNativeLoggedIn(true);
+        }
       } catch (error) {
         if (!cancelled) {
           setCloudSyncState("failed");
@@ -533,9 +616,52 @@ export default function App() {
             error instanceof Error ? error.message : "云端同步初始化失败。",
           );
         }
-      } finally {
+
         if (!cancelled) {
           setAuthStatus("ready");
+        }
+
+        return;
+      }
+
+      // 身份确认后立刻进入界面，云端工作区在后台补齐，避免每次打开都停在加载页。
+      setAuthStatus("ready");
+
+      if (!canUseCloudWorkspace(session)) {
+        return;
+      }
+
+      try {
+        setCloudSyncState("syncing");
+        const cloud = await getCloudWorkspace();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (cloud.workspace) {
+          skipNextCloudSaveRef.current = true;
+          replaceWorkspace(cloud.workspace);
+          cloudRevisionRef.current = cloud.updatedAt ?? 0;
+        } else {
+          const saved = await saveCloudWorkspace(getCurrentWorkspace());
+
+          if (cancelled) {
+            return;
+          }
+
+          cloudRevisionRef.current = saved.updatedAt ?? 0;
+          skipNextCloudSaveRef.current = true;
+        }
+
+        cloudHydratedUserIdRef.current = session.id;
+        setCloudSyncState("synced");
+      } catch (error) {
+        if (!cancelled) {
+          setCloudSyncState("failed");
+          setCloudSyncError(
+            error instanceof Error ? error.message : "云端同步初始化失败。",
+          );
         }
       }
     })();
@@ -731,6 +857,41 @@ export default function App() {
   }, [authUser, isTestDataMode]);
 
   useEffect(() => {
+    if (!canUseCloudWorkspace(authUser)) {
+      return;
+    }
+
+    const flushWorkspace = () => {
+      const workspace = getCurrentWorkspace();
+      persistNoteWorkspace(workspace);
+
+      if (
+        authStatus !== "ready" ||
+        cloudHydratedUserIdRef.current !== authUser.id
+      ) {
+        return;
+      }
+
+      if (cloudSaveTimeoutRef.current !== null) {
+        window.clearTimeout(cloudSaveTimeoutRef.current);
+        cloudSaveTimeoutRef.current = null;
+      }
+      cloudSaveQueueRef.current?.enqueue(workspace);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flushWorkspace();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", flushWorkspace);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", flushWorkspace);
+    };
+  }, [authStatus, authUser]);
+
+  useEffect(() => {
     function handleSaveShortcut(event: KeyboardEvent) {
       const hasBlockingOverlay =
         isSettingsOpen ||
@@ -740,7 +901,6 @@ export default function App() {
         isMoveDialogOpen ||
         isNoteSidebarOpen ||
         isCategorySidebarOpen ||
-        isDesktopViewMenuOpen ||
         isAccountMenuOpen ||
         isHermesSkillLinkResetConfirmationOpen ||
         aiReviewNoteId !== null ||
@@ -798,7 +958,6 @@ export default function App() {
     isCategorySidebarOpen,
     isChangePasswordOpen,
     isDesktopSharePreview,
-    isDesktopViewMenuOpen,
     isHermesSkillLinkResetConfirmationOpen,
     isLoginOpen,
     isMoveDialogOpen,
@@ -878,7 +1037,6 @@ export default function App() {
     selectNote(routedNote.id);
     setDesktopWorkspaceView(routedView);
     setMobileWorkspaceView(routedView);
-    setIsDesktopViewMenuOpen(false);
     setIsDesktopSharePreview(false);
     setIsShareOpen(false);
     setIsNoteSidebarOpen(false);
@@ -1137,7 +1295,7 @@ export default function App() {
   }, [isNoteSidebarOpen]);
 
   useEffect(() => {
-    if (!isDesktopViewMenuOpen) {
+    if (!isImageSourceMenuOpen) {
       return;
     }
 
@@ -1146,15 +1304,15 @@ export default function App() {
 
       if (
         target instanceof Node &&
-        !desktopViewMenuRef.current?.contains(target)
+        !insertImageMenuRef.current?.contains(target)
       ) {
-        setIsDesktopViewMenuOpen(false);
+        setIsImageSourceMenuOpen(false);
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsDesktopViewMenuOpen(false);
+        setIsImageSourceMenuOpen(false);
       }
     }
 
@@ -1165,7 +1323,39 @@ export default function App() {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isDesktopViewMenuOpen]);
+  }, [isImageSourceMenuOpen]);
+
+  useEffect(() => {
+    if (!isFormattingModeMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+
+      if (
+        target instanceof Node &&
+        !formattingModeMenuRef.current?.contains(target) &&
+        !mobileFormattingModeMenuRef.current?.contains(target)
+      ) {
+        setIsFormattingModeMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsFormattingModeMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFormattingModeMenuOpen]);
 
   useEffect(() => {
     if (!isMoveDialogOpen) {
@@ -1229,7 +1419,6 @@ export default function App() {
         isChangePasswordOpen ||
         isShareOpen ||
         isNoteSidebarOpen ||
-        isDesktopViewMenuOpen ||
         isMoveDialogOpen ||
         isCategorySidebarOpen ||
         Boolean(aiReviewNoteId) ||
@@ -1278,7 +1467,6 @@ export default function App() {
     isChangePasswordOpen,
     isDesktopFocusMode,
     isDesktopSharePreview,
-    isDesktopViewMenuOpen,
     isLoginOpen,
     isMoveDialogOpen,
     isNoteSidebarOpen,
@@ -1294,6 +1482,10 @@ export default function App() {
     const anonymousWorkspace = getCurrentWorkspace();
 
     try {
+      // 密码登录只返回用户对象，appFetch 里缓存的 CSRF 与身份仍是登录前的账号；
+      // 先读一次会话来刷新它们，否则随后的工作区读取会被「身份已变化」保护拦下，
+      // 表现为水合失败、编辑内容静默不保存。
+      await getAuthSession();
       const cloud = await getCloudWorkspace();
 
       if (cloud.workspace) {
@@ -1322,8 +1514,48 @@ export default function App() {
     setIsAccountMenuOpen(false);
   }
 
+  // 原生应用内的应用账号与飞牛账号同名，登录后仍沿用同一份私有便签。
+  async function handleNativeAccountLogin(
+    username: string,
+    password: string,
+    remember: boolean,
+  ) {
+    const user = await loginUser(username, password, remember);
+    await handleUserAuthenticated(user);
+    rememberNativeLoginConsent();
+    setIsNativeLoggedIn(true);
+    setNativeLoginError("");
+    return user;
+  }
+
+  async function handleNasLogin() {
+    setIsNasAuthConfirmationOpen(false);
+    setIsNasAuthorizing(true);
+    setNativeLoginError("");
+
+    try {
+      const authState = await getAuthState();
+
+      if (!authState.user) {
+        throw new Error("未能确认 NAS 登录态，请从飞牛桌面重新打开拾光便签。");
+      }
+
+      setRequireLogin(authState.requireLogin);
+      setHasNativeAppPassword(authState.appPassword);
+      await handleUserAuthenticated(authState.user);
+      rememberNativeLoginConsent();
+      setIsNativeLoggedIn(true);
+    } catch (error) {
+      setNativeLoginError(
+        error instanceof Error ? error.message : "NAS 登录失败，请稍后重试。",
+      );
+    } finally {
+      setIsNasAuthorizing(false);
+    }
+  }
+
   function resetAuthenticatedClientState() {
-    if (isNative) { recorder.setEnabled(false); resetNativeTestResults(); }
+    if (isNative) recorder.setEnabled(false);
     if (cloudSaveTimeoutRef.current !== null) {
       window.clearTimeout(cloudSaveTimeoutRef.current);
       cloudSaveTimeoutRef.current = null;
@@ -1345,7 +1577,6 @@ export default function App() {
   }
 
   async function handleLogout() {
-    if (isNative) { window.open(location.origin, "_blank", "noopener"); return; }
     if (
       canUseCloudWorkspace(authUser) &&
       cloudHydratedUserIdRef.current === authUser.id
@@ -1369,8 +1600,21 @@ export default function App() {
       }
     }
 
-    await logoutUser();
-    resetAuthenticatedClientState();
+    try {
+      await logoutUser();
+    } catch (error) {
+      // 即使浏览器会话清理请求失败，也必须先回到本机登录页。
+      // 否则 WebView 的来源头差异会让“退出登录”看起来完全没响应。
+      recorder.error(error instanceof Error ? error.name : "Error");
+    } finally {
+      resetAuthenticatedClientState();
+
+      if (isNative) {
+        forgetNativeLoginConsent();
+        setIsNativeLoggedIn(false);
+        setNativeLoginError("");
+      }
+    }
   }
 
   async function handleHermesSkillDownload() {
@@ -1461,6 +1705,7 @@ export default function App() {
       setIsExporting(true);
       setExportError("");
       await exportMarkdownAsPng(markdown, noteCardTheme, {
+        fontScale: noteFontScale,
         footerBrand,
         footerLogoUrl,
         footerVia,
@@ -1482,6 +1727,7 @@ export default function App() {
       setIsArchiving(true);
       setExportError("");
       await exportMarkdownArchive(markdown, noteCardTheme, {
+        fontScale: noteFontScale,
         footerBrand,
         footerLogoUrl,
         footerVia,
@@ -1540,11 +1786,16 @@ export default function App() {
     try {
       setWechatCopyState("preparing");
       setExportError("");
-      await copyMarkdownForWechat(markdown, noteCardTheme, {
-        footerBrand,
-        footerLogoUrl,
-        footerVia,
-      });
+      await copyMarkdownForWechat(
+        markdown,
+        noteCardTheme,
+        {
+          footerBrand,
+          footerLogoUrl,
+          footerVia,
+        },
+        noteFontScale,
+      );
       setWechatCopyState("copied");
     } catch (error) {
       console.error("Wechat rich-text copy failed", error);
@@ -1565,11 +1816,16 @@ export default function App() {
     try {
       setWechatDraftState("publishing");
       setExportError("");
-      await publishMarkdownAsWechatDraft(markdown, noteCardTheme, {
-        footerBrand,
-        footerLogoUrl,
-        footerVia,
-      });
+      await publishMarkdownAsWechatDraft(
+        markdown,
+        noteCardTheme,
+        {
+          footerBrand,
+          footerLogoUrl,
+          footerVia,
+        },
+        noteFontScale,
+      );
       setWechatDraftState("published");
     } catch (error) {
       console.error("Wechat draft publication failed", error);
@@ -1599,7 +1855,6 @@ export default function App() {
     mobileDraftNoteIdRef.current = createdNoteId;
     setDesktopWorkspaceView("editor");
     setMobileWorkspaceView("editor");
-    setIsDesktopViewMenuOpen(false);
     setIsDesktopSharePreview(false);
     writeCurrentNoteRoute(
       { noteId: createdNoteId, view: "editor" },
@@ -1631,6 +1886,30 @@ export default function App() {
     if (activeNoteId) {
       writeCurrentNoteRoute({ noteId: activeNoteId, view });
     }
+  }
+
+  async function flushPendingCloudSave(): Promise<boolean> {
+    persistNoteWorkspace(getCurrentWorkspace());
+
+    if (!canUseCloudWorkspace(authUser) || authStatus !== "ready") {
+      return true;
+    }
+
+    if (cloudHydratedUserIdRef.current !== authUser.id) {
+      setCloudSyncError("正在读取 NAS 便签，请稍候再保存。");
+      setCloudSyncState("failed");
+      return false;
+    }
+
+    if (cloudSaveTimeoutRef.current !== null) {
+      window.clearTimeout(cloudSaveTimeoutRef.current);
+      cloudSaveTimeoutRef.current = null;
+    }
+
+    setCloudSyncState("syncing");
+    cloudSaveQueueRef.current?.enqueue(getCurrentWorkspace());
+    await cloudSaveQueueRef.current?.whenIdle();
+    return !cloudFailureRef.current;
   }
 
   function handleDesktopWorkspaceViewChange(view: NoteRouteView) {
@@ -1666,15 +1945,56 @@ export default function App() {
     handleOpenAiReview();
   }
 
+  // 「刷新便签」是重新向服务端取一次当前工作区，并就地更新界面；
+  // 以前它直接 location.reload()，整页白屏重载，看起来像误操作。
   function handleRefreshNotes() {
-    if (refreshTimeoutRef.current !== null) {
+    if (refreshTimeoutRef.current !== null || authStatus !== "ready") {
+      return;
+    }
+
+    if (!canUseCloudWorkspace(authUser)) {
+      setIsRefreshingNotes(true);
+      refreshTimeoutRef.current = window.setTimeout(() => {
+        refreshTimeoutRef.current = null;
+        setIsRefreshingNotes(false);
+      }, NOTE_REFRESH_DELAY_MS);
       return;
     }
 
     setIsRefreshingNotes(true);
-    refreshTimeoutRef.current = window.setTimeout(() => {
-      window.location.reload();
-    }, NOTE_REFRESH_DELAY_MS);
+    void (async () => {
+      try {
+        if (cloudSaveTimeoutRef.current !== null) {
+          window.clearTimeout(cloudSaveTimeoutRef.current);
+          cloudSaveTimeoutRef.current = null;
+        }
+        if (cloudSaveQueueRef.current?.isSaving()) {
+          await cloudSaveQueueRef.current.whenIdle();
+        }
+
+        setCloudSyncState("syncing");
+        const cloud = await getCloudWorkspace();
+
+        if (cloud.workspace) {
+          skipNextCloudSaveRef.current = true;
+          replaceWorkspace(cloud.workspace);
+          cloudRevisionRef.current = cloud.updatedAt ?? 0;
+        }
+
+        setCloudSyncError("");
+        setCloudSyncState("synced");
+      } catch (error) {
+        setCloudSyncState("failed");
+        setCloudSyncError(
+          error instanceof Error ? error.message : "刷新便签失败。",
+        );
+      } finally {
+        refreshTimeoutRef.current = window.setTimeout(() => {
+          refreshTimeoutRef.current = null;
+          setIsRefreshingNotes(false);
+        }, 320);
+      }
+    })();
   }
 
   function handleSelectNote(noteId: string) {
@@ -1695,7 +2015,6 @@ export default function App() {
     setIsCategorySidebarOpen(false);
     setDesktopWorkspaceView(selectedView);
     setMobileWorkspaceView(selectedView);
-    setIsDesktopViewMenuOpen(false);
     setIsDesktopSharePreview(false);
     writeCurrentNoteRoute({ noteId, view: selectedView }, "push");
   }
@@ -1790,7 +2109,70 @@ export default function App() {
   function handleInsertImage() {
     setIsSettingsOpen(false);
     setIsShareOpen(false);
+    setIsImageSourceMenuOpen((isOpen) => !isOpen);
+  }
+
+  // 本机图片走浏览器的文件选择器。
+  function pickLocalImage() {
+    setIsImageSourceMenuOpen(false);
+    if (richEditorRef.current) {
+      richEditorRef.current.openImagePicker();
+      return;
+    }
     editorPanelRef.current?.openImagePicker();
+  }
+
+  // NAS 图片：通过飞牛文件选择器选择已授权文件，再由服务端读取并导入。
+  function pickNasImage() {
+    setIsImageSourceMenuOpen(false);
+
+    void (async () => {
+      try {
+        setIsImportingImage(true);
+        const { TrimApp } = await import("@trimjs/web-app");
+        const app = new TrimApp();
+        await app.ready();
+
+        if (app.isStandaloneWeb) {
+          window.alert("请从飞牛桌面打开应用后选择 NAS 图片。");
+          return;
+        }
+
+        const picked = await app.pickUserFile({
+          directory: false,
+          accept: ["image/*"],
+        });
+        const absolutePath = Array.isArray(picked?.data) ? picked.data[0] : undefined;
+        if (!absolutePath) return;
+
+        await nativeJson("/api/authorized-folders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Fnnotes-Host-Picker": "1",
+          },
+          body: JSON.stringify({ paths: [absolutePath] }),
+        });
+        const result = await importNasImage(absolutePath);
+        const snippet = `![](${result.path || result.url})`;
+        if (isRichMode && richEditorRef.current) {
+          richEditorRef.current.insertText(snippet);
+        } else {
+          insertMarkdownAtActiveNote(snippet);
+        }
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : "从 NAS 导入图片失败。");
+      } finally {
+        setIsImportingImage(false);
+      }
+    })();
+  }
+
+  // 在富文本模式下把 Markdown 图片行追加到正文；Markdown 模式同样落到 markdown。
+  function insertMarkdownAtActiveNote(snippet: string) {
+    if (!activeCategoryNote) return;
+    const next = markdown.length ? `${markdown}\n\n${snippet}` : snippet;
+    setMarkdown(next);
   }
 
   function handleShareTrigger() {
@@ -1798,7 +2180,6 @@ export default function App() {
 
     if (window.matchMedia("(min-width: 641px)").matches) {
       desktopViewBeforeShareRef.current = desktopWorkspaceView;
-      setIsDesktopViewMenuOpen(false);
       setIsDesktopSharePreview(true);
       setDesktopWorkspaceView("preview");
       return;
@@ -1853,8 +2234,8 @@ export default function App() {
       >
         {isNative && authUser ? <>
           <span className="settings-account-avatar native-account-avatar" aria-hidden="true">{Array.from(authUser.username.trim())[0]?.toLocaleUpperCase()}</span>
-          <span className="native-account-copy"><span className="auth-trigger-label">{authUser.username}</span><span className="native-account-status"><span className="auth-trigger-dot" aria-hidden="true" />{cloudSyncState === "syncing" ? "正在同步" : cloudSyncState === "failed" ? "同步异常" : "已登录 · 已同步"}</span></span>
-        </> : <><span className="auth-trigger-dot" aria-hidden="true" /><span className="auth-trigger-label">{authStatus === "loading" ? "检查登录..." : authUser?.username ?? "登录锤子便签"}</span></>}
+          <span className="native-account-copy"><span className="auth-trigger-label">{authUser.username}</span><span className={`native-account-status is-${cloudSyncState}`}><span className="auth-trigger-dot" aria-hidden="true" />{cloudSyncState === "syncing" ? "正在同步" : cloudSyncState === "failed" ? "同步异常" : "已登录 · 已同步"}</span></span>
+        </> : <><span className="auth-trigger-dot" aria-hidden="true" /><span className="auth-trigger-label">{authStatus === "loading" ? "检查登录..." : authUser?.username ?? "登录拾光便签"}</span></>}
       </button>
 
       {authUser && isAccountMenuOpen ? (
@@ -1880,6 +2261,19 @@ export default function App() {
               进入管理后台
             </a>
           ) : null}
+          {cloudSyncState === "failed" ? (
+            <button
+              type="button"
+              className="account-menu-item"
+              role="menuitem"
+              onClick={() => {
+                setIsAccountMenuOpen(false);
+                handleRefreshNotes();
+              }}
+            >
+              重试同步
+            </button>
+          ) : null}
           {!isNative && authUser.role === "user" ? (
             <button
               type="button"
@@ -1899,10 +2293,132 @@ export default function App() {
             role="menuitem"
             onClick={() => void handleLogout()}
           >
-            {isNative ? "前往飞牛管理账号" : "退出登录"}
+            退出登录
           </button>
         </div>
       ) : null}
+    </div>
+  );
+
+  const desktopViewSwitch = (
+    <button
+      type="button"
+      className={`desktop-toolbar-button desktop-workspace-view-toggle is-${desktopWorkspaceView}`}
+      aria-label={
+        desktopWorkspaceView === "editor" ? "切换到实时预览" : "切换到编辑"
+      }
+      title={
+        desktopWorkspaceView === "editor" ? "实时预览" : "返回编辑"
+      }
+      onClick={() =>
+        handleDesktopWorkspaceViewChange(
+          desktopWorkspaceView === "editor" ? "preview" : "editor",
+        )
+      }
+    >
+      {desktopWorkspaceView === "editor" ? (
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M2.3 10s2.8-4.6 7.7-4.6 7.7 4.6 7.7 4.6-2.8 4.6-7.7 4.6S2.3 10 2.3 10Z" />
+          <circle cx="10" cy="10" r="2.5" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="m4 16 1.2-4.1L13.9 3.2l3 3-8.7 8.7L4 16Z" />
+          <path d="m12.3 4.8 3 3M5.2 11.9l3 3" />
+        </svg>
+      )}
+    </button>
+  );
+
+  const desktopFormatModeSwitch = (
+    <div className="desktop-format-mode" ref={formattingModeMenuRef}>
+      <button
+        type="button"
+        className="desktop-format-mode-trigger"
+        aria-label="切换排版模式"
+        aria-haspopup="menu"
+        aria-expanded={isFormattingModeMenuOpen}
+        disabled={!activeCategoryNote || activeCategoryId === "trash"}
+        onClick={() => setIsFormattingModeMenuOpen((isOpen) => !isOpen)}
+      >
+        <FormatModeBadge mode={formattingMode} />
+        <span>{FORMATTING_MODE_LABELS[formattingMode]}</span>
+        <span className="desktop-view-switch-arrow" aria-hidden="true" />
+      </button>
+
+      {isFormattingModeMenuOpen ? (
+        <div className="desktop-view-menu" role="menu">
+          {FORMATTING_MODE_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={formattingMode === option.id}
+              className={formattingMode === option.id ? "is-active" : undefined}
+              onClick={() => {
+                recorder.action("format.mode", option.id);
+                setFormattingMode(option.id);
+                setIsFormattingModeMenuOpen(false);
+              }}
+            >
+              <span aria-hidden="true">
+                {formattingMode === option.id ? "✓" : ""}
+              </span>
+              <FormatModeBadge mode={option.id} />
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const desktopFontScale = (
+    <div className="desktop-note-scale">
+      <div className="desktop-font-scale" role="group" aria-label="便签字号">
+        <button
+          type="button"
+          className="desktop-font-scale-button"
+          aria-label="缩小便签字号"
+          title={`缩小字号（当前${getNoteFontScaleLabel(noteFontScale)}）`}
+          disabled={
+            !activeCategoryNote ||
+            activeCategoryId === "trash" ||
+            !canStepNoteFontScale(noteFontScale, -1)
+          }
+          onClick={() => {
+            recorder.action("note.fontScale");
+            setNoteFontScale(stepNoteFontScale(noteFontScale, -1));
+          }}
+        >
+          A−
+        </button>
+        <button
+          type="button"
+          className="desktop-font-scale-button"
+          aria-label="放大便签字号"
+          title={`放大字号（当前${getNoteFontScaleLabel(noteFontScale)}）`}
+          disabled={
+            !activeCategoryNote ||
+            activeCategoryId === "trash" ||
+            !canStepNoteFontScale(noteFontScale, 1)
+          }
+          onClick={() => {
+            recorder.action("note.fontScale");
+            setNoteFontScale(stepNoteFontScale(noteFontScale, 1));
+          }}
+        >
+          A+
+        </button>
+      </div>
+      <span aria-hidden="true">|</span>
+    </div>
+  );
+
+  const desktopFormatControls = (
+    <div className="desktop-format-controls">
+      {desktopFormatModeSwitch}
+      {desktopFontScale}
     </div>
   );
 
@@ -1912,12 +2428,21 @@ export default function App() {
     </div>
   );
 
+  const nativeScopeLabel = nativeReadOnly
+    ? "共享空间 · 只读"
+    : new URLSearchParams(location.search).has("space")
+      ? "共享空间 · 可编辑"
+      : "私有便签";
+
   const settingsPanel = isSettingsOpen ? (
     <SettingsPanel
       aiAvailable={aiAvailable}
       aiEnabled={aiEnabled}
+      appVersion={isNative ? nativeMetadata.appVersion : ""}
+      upstreamVersion={isNative ? nativeMetadata.upstreamVersion : ""}
+      appPasswordConfigured={hasNativeAppPassword}
       authUsername={authUser?.username}
-      canChangePassword={!isNative && authUser?.role === "user"}
+      canChangePassword={authUser?.role === "user"}
       onNativeSpaceChange={changeNativeSpace}
       canConfigureWechat={Boolean(authUser)}
       cloudStatusLabel={
@@ -1975,8 +2500,34 @@ export default function App() {
     );
   }
 
+  // 原生应用首次打开先确认登录方式；确认过一次后不再拦截。
+  // 已确认但拿不到 NAS 身份时（例如不是在飞牛桌面里打开）仍然给出同一条登录页。
+  if (isNative && (!isNativeLoggedIn || (requireLogin && !authUser))) {
+    return (
+      <main className="required-login-page" data-native-login="true">
+        <LoginDialog
+          error={nativeLoginError || cloudSyncError}
+          title="拾光便签"
+          note="NAS 用户直接使用「使用 NAS 登录」，与账号密码登录共用同一份私有便签；应用密码可在「设置 → 账号与同步」中设置。"
+          nasLogin={{
+            isBusy: isNasAuthorizing,
+            onAuthorize: () => setIsNasAuthConfirmationOpen(true),
+          }}
+          login={handleNativeAccountLogin}
+          onAuthenticated={handleUserAuthenticated}
+        />
+        <ConfirmDialog
+          pendingAction={
+            isNasAuthConfirmationOpen ? NATIVE_NAS_AUTH_CONFIRMATION : null
+          }
+          onClose={() => setIsNasAuthConfirmationOpen(false)}
+          onConfirm={() => void handleNasLogin()}
+        />
+      </main>
+    );
+  }
+
   if (!isPlaywrightRender && requireLogin && !authUser) {
-    if (isNative) return <main className="required-login-page"><h1>拾光便签</h1><p>请使用当前 NAS 的飞牛登录态打开应用。应用不收集或验证 NAS 密码。</p><p>{cloudSyncError}</p><button onClick={() => location.reload()}>重新确认飞牛身份</button></main>;
     return (
       <main className="required-login-page" data-require-login="true">
         <LoginDialog
@@ -1989,10 +2540,10 @@ export default function App() {
 
   return (
     <>
-      {isNative && !isSettingsOpen && <div className="native-scope-label">{nativeReadOnly ? "共享空间 · 只读" : new URLSearchParams(location.search).has("space") ? "共享空间 · 可编辑" : "私有便签"}</div>}
       <div
         className="app-layout"
         data-fnos-native={isNative ? "true" : undefined}
+        style={{ "--note-font-scale": String(noteFontScale) } as CSSProperties}
         data-theme={resolvedTheme}
         data-theme-preference={selectedTheme}
         data-authenticated={authUser ? "true" : "false"}
@@ -2043,12 +2594,15 @@ export default function App() {
                 onClick={handleSettingsToggle}
               >
                 <span className="app-brand-mark" aria-hidden="true">
-                  <img src={appPath("/header/logo.png")} alt="" />
+                  <img src={appPath("/brand/shiguang-app-icon.png")} alt="拾光便签" />
                 </span>
               </button>
               <div className="app-brand-copy">
-                <span className="app-brand-title">{isNative ? "拾光便签" : "锤子便签"}</span>
+                <span className="app-brand-title">{"拾光便签"}</span>
               </div>
+              {isNative ? (
+                <span className="native-scope-chip">{nativeScopeLabel}</span>
+              ) : null}
             </div>
 
             <button
@@ -2100,6 +2654,7 @@ export default function App() {
               >
                 <span className="smartisan-toolbar-icon icon-create" aria-hidden="true" />
               </button>
+              {desktopViewSwitch}
             </div>
 
             <div className="app-topbar-actions">
@@ -2108,18 +2663,42 @@ export default function App() {
               </button>
 
               <div className="mobile-detail-actions">
-                <button
-                  type="button"
-                  className="mobile-detail-action mobile-insert-image"
-                  aria-label={isImportingImage ? "正在导入图片" : "插入图片"}
-                  disabled={isImportingImage}
-                  onClick={handleInsertImage}
-                >
-                  <span
-                    className="smartisan-toolbar-icon icon-insert-image"
-                    aria-hidden="true"
-                  />
-                </button>
+                <div className="desktop-insert-image-wrap" ref={insertImageMenuRef}>
+                  <button
+                    type="button"
+                    className="mobile-detail-action mobile-insert-image"
+                    aria-label={isImportingImage ? "正在导入图片" : "插入图片"}
+                    aria-haspopup="menu"
+                    aria-expanded={isImageSourceMenuOpen}
+                    disabled={isImportingImage}
+                    onClick={handleInsertImage}
+                  >
+                    <span
+                      className="smartisan-toolbar-icon icon-insert-image"
+                      aria-hidden="true"
+                    />
+                  </button>
+                  {isImageSourceMenuOpen ? (
+                    <div className="desktop-view-menu image-source-menu" role="menu">
+                      {isNative ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={pickNasImage}
+                        >
+                          <span aria-hidden="true">NAS 本地</span>
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={pickLocalImage}
+                      >
+                        <span aria-hidden="true">电脑本地</span>
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
                 <button
                   type="button"
                   className="mobile-detail-action desktop-move-note"
@@ -2131,9 +2710,22 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  className="mobile-detail-action mobile-edit-done"
-                  aria-label="完成编辑并预览"
-                  onClick={() => handleMobileWorkspaceViewChange("preview")}
+                  className={`mobile-detail-action mobile-edit-done${mobileWorkspaceView === "preview" ? " is-preview" : ""}`}
+                  aria-label={
+                    mobileWorkspaceView === "preview"
+                      ? "返回编辑"
+                      : "保存并预览"
+                  }
+                  onClick={() => {
+                    if (mobileWorkspaceView === "preview") {
+                      handleMobileWorkspaceViewChange("editor");
+                      return;
+                    }
+
+                    void flushPendingCloudSave().then((saved) => {
+                      if (saved) handleMobileWorkspaceViewChange("preview");
+                    });
+                  }}
                 >
                   <span className="smartisan-toolbar-icon icon-create" aria-hidden="true" />
                 </button>
@@ -2154,6 +2746,16 @@ export default function App() {
                     >
                       AI
                     </button>
+                  ) : null}
+                  {isNative && desktopWorkspaceView === "editor" ? (
+                    <NoteCardThemePicker
+                      className="topbar-theme-control"
+                      value={noteCardTheme}
+                      onChange={(theme) => {
+                        recorder.action("theme.change");
+                        setNoteCardThemeOverride(theme);
+                      }}
+                    />
                   ) : null}
                   <button
                     type="button"
@@ -2365,77 +2967,44 @@ export default function App() {
               <span className="desktop-focus-back-icon" aria-hidden="true" />
             </button>
 
-            <div className="desktop-view-switch" ref={desktopViewMenuRef}>
-              <button
-                type="button"
-                className="desktop-view-switch-trigger"
-                aria-label="切换编辑与实时预览"
-                aria-haspopup="menu"
-                aria-expanded={isDesktopViewMenuOpen}
-                onClick={() => setIsDesktopViewMenuOpen((isOpen) => !isOpen)}
-              >
-                <span>
-                  {desktopWorkspaceView === "editor" ? "Markdown 模式" : "实时预览"}
-                </span>
-                <span className="desktop-view-switch-arrow" aria-hidden="true" />
-              </button>
-
-              {isDesktopViewMenuOpen ? (
-                <div className="desktop-view-menu" role="menu">
-                  {(
-                    [
-                      ["editor", "Markdown 模式"],
-                      ["preview", "实时预览"],
-                    ] as const
-                  ).map(([view, label]) => (
-                    <button
-                      type="button"
-                      key={view}
-                      role="menuitemradio"
-                      aria-checked={desktopWorkspaceView === view}
-                      className={
-                        desktopWorkspaceView === view ? "is-active" : undefined
-                      }
-                      onClick={() => {
-                        handleDesktopWorkspaceViewChange(view);
-                        setIsDesktopViewMenuOpen(false);
-                      }}
-                    >
-                      <span aria-hidden="true">
-                        {desktopWorkspaceView === view ? "✓" : ""}
-                      </span>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            {desktopFormatControls}
 
             <div className="desktop-note-status" aria-label="当前便签信息">
-              <label className="desktop-note-folder">
-                <span className="desktop-note-folder-icon" aria-hidden="true" />
-                <span className="visually-hidden">移动当前便签到文件夹</span>
-                <select
-                  aria-label="移动当前便签到文件夹"
-                  disabled={!activeCategoryNote || activeCategoryId === "trash"}
-                  value={activeNote?.folderId ?? ""}
-                  onChange={(event) =>
-                    handleMoveCurrentNoteToFolder(event.target.value || null)
-                  }
-                >
-                  <option value="">全部便签</option>
-                  {folders.map((folder) => (
-                    <option key={folder.id} value={folder.id}>
-                      {folder.name}
-                    </option>
-                  ))}
-                </select>
-                <span className="desktop-note-folder-arrow" aria-hidden="true" />
-              </label>
+              {isRichMode && !isMobileLayout ? (
+                <RichTextToolbar
+                  disabled={nativeReadOnly || nativeSwitching || activeCategoryId === "trash"}
+                  onAction={(shortcut) => {
+                    recorder.action("format.rich", shortcut);
+                    richEditorRef.current?.applyShortcut(shortcut);
+                  }}
+                  state={richToolbarState}
+                />
+              ) : null}
               <span aria-hidden="true">|</span>
-              <span>{formatMobileNoteUpdatedAt(activeCategoryNote?.updatedAt)}</span>
-              <span aria-hidden="true">|</span>
-              <span>{mobileNoteCharacterCount} 字</span>
+              {/* 顶栏只保留当前便签最常用的动作：加星。移动文件夹在便签列表里操作。 */}
+              <button
+                type="button"
+                className={`desktop-note-star${activeCategoryNote?.isStarred ? " is-starred" : ""}`}
+                aria-label={
+                  activeCategoryNote?.isStarred ? "取消加星当前便签" : "给当前便签加星"
+                }
+                aria-pressed={Boolean(activeCategoryNote?.isStarred)}
+                title={activeCategoryNote?.isStarred ? "取消加星" : "加星"}
+                disabled={!activeCategoryNote || activeCategoryId === "trash"}
+                onClick={() => {
+                  if (!activeCategoryNote) return;
+                  recorder.action("note.star");
+                  toggleStarred(activeCategoryNote.id);
+                }}
+              >
+                <span className="desktop-note-star-icon" aria-hidden="true" />
+              </button>
+              <div className="desktop-note-meta">
+                <span aria-hidden="true">|</span>
+                <span>{formatMobileNoteUpdatedAt(activeCategoryNote?.updatedAt)}</span>
+                <span aria-hidden="true">|</span>
+                <span>{mobileNoteCharacterCount} 字</span>
+              </div>
               <span aria-hidden="true">|</span>
               <button
                 type="button"
@@ -2449,7 +3018,6 @@ export default function App() {
                   setIsDesktopFocusMode((isFocused) => {
                     if (!isFocused) {
                       handleDesktopWorkspaceViewChange("editor");
-                      setIsDesktopViewMenuOpen(false);
                       setIsCategorySidebarOpen(false);
                       setIsNoteSidebarOpen(false);
                     }
@@ -2495,31 +3063,118 @@ export default function App() {
             </span>
             <button
               type="button"
-              className="mobile-view-toggle"
-              aria-pressed={mobileWorkspaceView === "preview"}
-              aria-label={
-                mobileWorkspaceView === "preview"
-                  ? "切换到 Markdown 编辑"
-                  : "切换到便签预览"
-              }
-              onClick={() =>
-                handleMobileWorkspaceViewChange(
-                  mobileWorkspaceView === "preview" ? "editor" : "preview",
-                )
-              }
+              className={`desktop-note-star mobile-note-star${activeCategoryNote?.isStarred ? " is-starred" : ""}`}
+              aria-label={activeCategoryNote?.isStarred ? "取消加星当前便签" : "给当前便签加星"}
+              aria-pressed={Boolean(activeCategoryNote?.isStarred)}
+              disabled={!activeCategoryNote || activeCategoryId === "trash"}
+              onClick={() => {
+                if (activeCategoryNote) toggleStarred(activeCategoryNote.id);
+              }}
             >
-              {mobileWorkspaceView === "preview" ? "编辑" : "预览"}
+              <span className="desktop-note-star-icon" aria-hidden="true" />
             </button>
+            <div className="mobile-format-mode" ref={mobileFormattingModeMenuRef}>
+              <button
+                type="button"
+                className="mobile-format-mode-trigger"
+                aria-label="切换排版模式"
+                aria-haspopup="menu"
+                aria-expanded={isFormattingModeMenuOpen}
+                disabled={!activeCategoryNote || activeCategoryId === "trash"}
+                onClick={() => setIsFormattingModeMenuOpen((isOpen) => !isOpen)}
+              >
+                <FormatModeBadge mode={formattingMode} />
+                <span className="desktop-view-switch-arrow" aria-hidden="true" />
+              </button>
+              {isFormattingModeMenuOpen ? (
+                <div className="desktop-view-menu mobile-format-menu" role="menu">
+                  {FORMATTING_MODE_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={formattingMode === option.id}
+                      className={formattingMode === option.id ? "is-active" : undefined}
+                      onClick={() => {
+                        recorder.action("format.mode", option.id);
+                        setFormattingMode(option.id);
+                        setIsFormattingModeMenuOpen(false);
+                      }}
+                    >
+                      <span aria-hidden="true">
+                        {formattingMode === option.id ? "✓" : ""}
+                      </span>
+                      <FormatModeBadge mode={option.id} />
+                      {option.label}
+                    </button>
+                  ))}
+                  <div className="mobile-format-size-row" role="group" aria-label="便签字号">
+                    <button
+                      type="button"
+                      aria-label="缩小便签字号"
+                      disabled={
+                        !activeCategoryNote ||
+                        activeCategoryId === "trash" ||
+                        !canStepNoteFontScale(noteFontScale, -1)
+                      }
+                      onClick={() => setNoteFontScale(stepNoteFontScale(noteFontScale, -1))}
+                    >
+                      A−
+                    </button>
+                    <span>{getNoteFontScaleLabel(noteFontScale)}</span>
+                    <button
+                      type="button"
+                      aria-label="放大便签字号"
+                      disabled={
+                        !activeCategoryNote ||
+                        activeCategoryId === "trash" ||
+                        !canStepNoteFontScale(noteFontScale, 1)
+                      }
+                      onClick={() => setNoteFontScale(stepNoteFontScale(noteFontScale, 1))}
+                    >
+                      A+
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
 
-          <EditorPanel
-            key={activeNoteId}
-            ref={editorPanelRef}
-            markdown={markdown}
-            onImageImportingChange={setIsImportingImage}
-            onMarkdownChange={setMarkdown}
-            readOnly={nativeReadOnly || nativeSwitching}
-          />
+          {isRichMode ? (
+            <aside className="editor-panel" key={`rich-${activeNoteId}`}>
+              <RichTextEditor
+                ref={richEditorRef}
+                onImageImportingChange={setIsImportingImage}
+                onRichTextChange={setRichStyles}
+                onToolbarStateChange={setRichToolbarState}
+                readOnly={nativeReadOnly || nativeSwitching}
+                richText={
+                  richContent ?? { inline: [], lineStyles: {}, text: "" }
+                }
+              />
+              {/* 手机详情栏放不下八个按钮，工具栏排到编辑区底部（与官方移动端一致）。 */}
+              {isMobileLayout ? (
+                <RichTextToolbar
+                  compact
+                  disabled={nativeReadOnly || nativeSwitching || activeCategoryId === "trash"}
+                  onAction={(shortcut) => {
+                    recorder.action("format.rich", shortcut);
+                    richEditorRef.current?.applyShortcut(shortcut);
+                  }}
+                  state={richToolbarState}
+                />
+              ) : null}
+            </aside>
+          ) : (
+            <EditorPanel
+              key={activeNoteId}
+              ref={editorPanelRef}
+              markdown={editorText}
+              onImageImportingChange={setIsImportingImage}
+              onMarkdownChange={setMarkdown}
+              readOnly={nativeReadOnly || nativeSwitching}
+            />
+          )}
 
           <PreviewPanel
             notes={notes}
@@ -2578,7 +3233,9 @@ export default function App() {
       {isChangePasswordOpen ? (
         <ChangePasswordDialog
           changePassword={changeUserPassword}
+          initialSetup={isNative && !hasNativeAppPassword}
           onClose={() => setIsChangePasswordOpen(false)}
+          onPasswordSet={() => setHasNativeAppPassword(true)}
         />
       ) : null}
 

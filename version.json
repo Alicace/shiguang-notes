@@ -1,0 +1,16 @@
+{
+  "version": "0.9.0",
+  "release_url": "https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.0",
+  "published_at": "2026-10-17",
+  "release_notes": "拾光便签 0.9.0 正式版本。",
+  "asset": {
+    "name": "fnnotes-m0_0.9.0_x86_64.fpk",
+    "size": 67838981,
+    "sha256": "a3752ef54132c75c51299aec29b7ead058b00caa7b59dbeed616ed0ec296606e",
+    "urls": [
+      "https://github.com/Alicace/shiguang-notes/releases/download/v0.9.0/fnnotes-m0_0.9.0_x86_64.fpk",
+      "https://ghfast.top/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.0/fnnotes-m0_0.9.0_x86_64.fpk",
+      "https://gh-proxy.com/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.0/fnnotes-m0_0.9.0_x86_64.fpk"
+    ]
+  }
+}

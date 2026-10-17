@@ -140,7 +140,7 @@ test("裁剪替换图片地址并支持把图片按正文行重新插入", () =>
   );
 });
 
-test("编辑器以内联图片块复刻锤子便签，并保留原生 textarea 输入控件", () => {
+test("编辑器以内联图片块复刻拾光便签，并保留原生 textarea 输入控件", () => {
   const editorSource = readFileSync("src/components/EditorPanel.tsx", "utf8");
   const styles = readFileSync("src/styles.css", "utf8");
 

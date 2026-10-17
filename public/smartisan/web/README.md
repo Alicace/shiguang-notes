@@ -10,7 +10,10 @@
 - `filter-icon-*.png`：分类图标
 - `create_folder_09cb2d75c6.png`：新建文件夹按钮
 - `folder_icon_dc8a8d7563.png`：文件夹图标
-- `smartisan_hammer_footer.png`：底部署名使用的 48 × 48px 圆形锤子标志；
-  轮廓参考 [AnimaUI 的 Smartisan 图标](https://www.veryicon.com/icons/application/animaui/smartisan-fill-round.html)
-  （页面标注可免费商用），并重新映射为便签纸的 `#d7cec1 / #fefcf6` 色值。
+  轮廓参考 AnimaUI 的圆形便签图标（页面标注可免费商用），并重新映射为
+  便签纸的 `#d7cec1 / #fefcf6` 色值。
   圆形之外使用透明通道，避免微信公众号暗黑模式把图标显示成浅色方块。
+
+本目录中的界面纹理与 Sprite 来自上游便签项目的历史资源。拾光便签不再把它们用作
+应用图标、登录图标或品牌标识；公开发行第三方衍生版本前，仍应单独核对相应美术资源的
+使用条件。

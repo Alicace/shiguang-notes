@@ -19,7 +19,7 @@ export const THEME_OPTIONS: ThemeOption[] = [
   },
   {
     id: "smartisan-dark",
-    label: "锤子暗黑",
+    label: "拾光暗黑",
     description: "深夜便签",
   },
 ];
@@ -57,7 +57,7 @@ export const NOTE_CARD_THEME_OPTIONS: NoteCardThemeOption[] = [
   },
   {
     id: "bazhahei",
-    label: "老罗巴扎嘿",
+    label: "暖色杂志",
     description: "暖色杂志排版",
   },
   {

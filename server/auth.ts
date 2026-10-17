@@ -20,6 +20,8 @@ const rememberedSessionDurationSeconds = 30 * 24 * 60 * 60;
 const generatedPasswordAlphabet =
   "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 const runtimeSessionSecret = randomBytes(32).toString("base64url");
+// 飞牛托管账号在设置应用密码前使用这个占位值，不参与密码校验。
+const fnosOnlyPasswordHash = "fnos-login-only";
 
 export type AuthRole = "user" | "superadmin";
 
@@ -35,11 +37,22 @@ export interface AccountSummary {
   username: string;
 }
 
+export type AccountKind = "nas" | "app";
+
+// 用户管理用的账号视图：区分飞牛托管账号与应用自建账号，并带上租户隔离所需的信息。
+export interface ManagedAccount extends AccountSummary {
+  disabled: boolean;
+  hasPassword: boolean;
+  kind: AccountKind;
+  uid?: number;
+}
+
 export interface CreatedAccount extends AccountSummary {
   initialPassword: string;
 }
 
 export interface AuthenticatedAccount extends AccountSummary {
+  disabled: boolean;
   passwordVersion: number;
   skillTokenVersion: number;
 }
@@ -68,6 +81,7 @@ export interface AnonymousQuotaStatus {
 }
 
 interface StoredAccount extends AccountSummary {
+  disabled?: boolean;
   normalizedUsername: string;
   passwordHash: string;
   passwordSalt: string;
@@ -219,6 +233,25 @@ export function normalizeUsername(username: string): string {
   return username.trim().normalize("NFKC").toLocaleLowerCase("zh-CN");
 }
 
+// 飞牛托管账号的 id 形如 nas-<uid>，用于在用户管理里区分两类租户。
+export function accountKindOf(id: string): AccountKind {
+  return /^nas-\d+$/.test(id) ? "nas" : "app";
+}
+
+function toManagedAccount(account: StoredAccount): ManagedAccount {
+  const kind = accountKindOf(account.id);
+
+  return {
+    createdAt: account.createdAt,
+    disabled: account.disabled === true,
+    hasPassword: account.passwordHash !== fnosOnlyPasswordHash,
+    id: account.id,
+    kind,
+    username: account.username,
+    ...(kind === "nas" ? { uid: Number(account.id.slice(4)) } : {}),
+  };
+}
+
 export function validateUsername(username: string): string {
   const normalizedDisplayName = username.trim().normalize("NFKC");
   const isUsername = /^[\p{L}\p{N}._-]{3,32}$/u.test(
@@ -349,6 +382,7 @@ function parseStoredAccount(value: unknown): StoredAccount | null {
   ) {
     return {
       createdAt: account.createdAt,
+      disabled: account.disabled === true,
       id: account.id,
       normalizedUsername: account.normalizedUsername,
       passwordHash: account.passwordHash,
@@ -582,24 +616,62 @@ export class NotesDataStore {
       .sort((left, right) => right.createdAt - left.createdAt);
   }
 
+  // 用户管理列表：飞牛托管账号用 nas-<uid>，应用自建账号用随机 id；
+  // 两者都按账号 id 存放各自的工作区，天然是独立租户。
+  async listManagedAccounts(): Promise<ManagedAccount[]> {
+    const database = await this.readDatabase();
+
+    return database.users
+      .map((account) => toManagedAccount(account))
+      .sort((left, right) => {
+        if (left.kind !== right.kind) {
+          return left.kind === "nas" ? -1 : 1;
+        }
+
+        return left.username.localeCompare(right.username, "zh-CN");
+      });
+  }
+
+  async getManagedAccount(userId: string): Promise<ManagedAccount | null> {
+    const account = (await this.readDatabase()).users.find(
+      (candidate) => candidate.id === userId,
+    );
+
+    return account ? toManagedAccount(account) : null;
+  }
+
   async ensureFnosUser(uid: number, username: string): Promise<AuthenticatedAccount> {
     return this.runExclusive(async () => {
       const database = await this.readDatabase();
       const id = `nas-${uid}`;
       let account = database.users.find((item) => item.id === id);
+      // 用 NAS 用户名索引，NAS 账号才能在设置应用密码后用「用户名 + 密码」登录；
+      // 名字已被其他应用账号占用时保留原样，该账号仍可用 NAS 身份登录。
+      const normalizedUsername = normalizeUsername(username);
+      const isNameTaken = database.users.some((item) => item.id !== id && item.normalizedUsername === normalizedUsername);
       if (!account) {
-        account = { id, username, normalizedUsername: id, createdAt: Date.now(), passwordHash: "fnos-login-only", passwordSalt: "fnos-login-only", passwordVersion: 1, skillTokenVersion: 1 };
+        account = { id, username, normalizedUsername: isNameTaken ? id : normalizedUsername, createdAt: Date.now(), passwordHash: fnosOnlyPasswordHash, passwordSalt: fnosOnlyPasswordHash, passwordVersion: 1, skillTokenVersion: 1 };
         database.users.push(account);
         await this.writeDatabase(database);
-      } else if (account.username !== username) {
+      } else if (account.username !== username || (!isNameTaken && account.normalizedUsername !== normalizedUsername)) {
         account.username = username;
+        if (!isNameTaken) account.normalizedUsername = normalizedUsername;
         await this.writeDatabase(database);
       }
-      return { id, username, createdAt: account.createdAt, passwordVersion: account.passwordVersion, skillTokenVersion: account.skillTokenVersion };
+      return { id, username, createdAt: account.createdAt, disabled: Boolean(account.disabled), passwordVersion: account.passwordVersion, skillTokenVersion: account.skillTokenVersion };
     });
   }
 
   async createUser(username: string): Promise<CreatedAccount> {
+    const created = await this.createAppAccount(username);
+    return created;
+  }
+
+  // 应用自建账号：管理员直接指定用户名（可选密码，缺省生成一次性密码）。
+  async createAppAccount(
+    username: string,
+    password?: string,
+  ): Promise<CreatedAccount> {
     return this.runExclusive(async () => {
       const displayUsername = validateUsername(username);
       const normalizedUsername = normalizeUsername(displayUsername);
@@ -613,14 +685,17 @@ export class NotesDataStore {
         throw new DuplicateUsernameError();
       }
 
-      const initialPassword = generateInitialPassword();
-      const password = await hashPassword(initialPassword);
+      const initialPassword = password
+        ? validateNewPassword(password)
+        : generateInitialPassword();
+      const hashed = await hashPassword(initialPassword);
       const account: StoredAccount = {
         createdAt: Date.now(),
+        disabled: false,
         id: randomUUID(),
         normalizedUsername,
-        passwordHash: password.hash,
-        passwordSalt: password.salt,
+        passwordHash: hashed.hash,
+        passwordSalt: hashed.salt,
         passwordVersion: 1,
         skillTokenVersion: 1,
         username: displayUsername,
@@ -638,6 +713,53 @@ export class NotesDataStore {
     });
   }
 
+  // 停用同时把会话版本往前推：已签发的 Cookie 与 Skill Token 立即失效。
+  async setAccountDisabled(
+    userId: string,
+    disabled: boolean,
+  ): Promise<ManagedAccount> {
+    return this.runExclusive(async () => {
+      const database = await this.readDatabase();
+      const account = database.users.find((candidate) => candidate.id === userId);
+
+      if (!account) {
+        throw new AccountNotFoundError();
+      }
+
+      account.disabled = disabled;
+
+      if (disabled) {
+        account.passwordVersion += 1;
+        account.skillTokenVersion += 1;
+      }
+
+      await this.writeDatabase(database);
+      return toManagedAccount(account);
+    });
+  }
+
+  // 删除账号连同它的工作区一起清掉，避免留下无主租户数据。
+  async deleteAccount(userId: string): Promise<ManagedAccount> {
+    return this.runExclusive(async () => {
+      const database = await this.readDatabase();
+      const account = database.users.find((candidate) => candidate.id === userId);
+
+      if (!account) {
+        throw new AccountNotFoundError();
+      }
+
+      database.users = database.users.filter(
+        (candidate) => candidate.id !== userId,
+      );
+      delete database.workspaces[userId];
+      delete database.wechatConfigurations[userId];
+      delete database.hermesInstallLinks[userId];
+      await this.writeDatabase(database);
+
+      return toManagedAccount(account);
+    });
+  }
+
   async authenticateUser(
     username: string,
     password: string,
@@ -650,7 +772,8 @@ export class NotesDataStore {
 
     if (
       !account ||
-      account.id.startsWith("nas-") ||
+      account.disabled === true ||
+      (account.id.startsWith("nas-") && account.passwordHash === fnosOnlyPasswordHash) ||
       !(await verifyPassword(
         password,
         account.passwordSalt,
@@ -662,6 +785,7 @@ export class NotesDataStore {
 
     return {
       createdAt: account.createdAt,
+      disabled: Boolean(account.disabled),
       id: account.id,
       passwordVersion: account.passwordVersion,
       skillTokenVersion: account.skillTokenVersion,
@@ -676,6 +800,7 @@ export class NotesDataStore {
     return account
       ? {
           createdAt: account.createdAt,
+          disabled: Boolean(account.disabled),
           id: account.id,
           passwordVersion: account.passwordVersion,
           skillTokenVersion: account.skillTokenVersion,
@@ -740,6 +865,16 @@ export class NotesDataStore {
     currentPassword: string,
     newPassword: string,
   ): Promise<number> {
+    return this.writePassword(userId, newPassword, currentPassword);
+  }
+
+  // NAS 账号第一次设置应用密码：登录态已由飞牛网关校验，不要求当前密码。
+  async setFnosAppPassword(userId: string, newPassword: string): Promise<number> {
+    return this.writePassword(userId, newPassword);
+  }
+
+  // 管理员直接为账号设置新密码：跳过旧密码校验，但同样轮换会话与 Token 版本。
+  async setAccountPasswordAsAdmin(userId: string, newPassword: string): Promise<number> {
     return this.runExclusive(async () => {
       const validatedPassword = validateNewPassword(newPassword);
       const database = await this.readDatabase();
@@ -747,6 +882,65 @@ export class NotesDataStore {
 
       if (!account) {
         throw new AccountNotFoundError();
+      }
+
+      if (
+        await verifyPassword(
+          validatedPassword,
+          account.passwordSalt,
+          account.passwordHash,
+        )
+      ) {
+        throw new InvalidNewPasswordError("新密码不能与当前密码相同。");
+      }
+
+      const password = await hashPassword(validatedPassword);
+      account.passwordHash = password.hash;
+      account.passwordSalt = password.salt;
+      account.passwordVersion += 1;
+      account.skillTokenVersion += 1;
+      await this.writeDatabase(database);
+      return account.passwordVersion;
+    });
+  }
+
+  // 判断账号是否已经设置过应用密码；飞牛托管账号的占位值不算。
+  async hasAppPassword(userId: string): Promise<boolean> {
+    const account = (await this.readDatabase()).users.find(
+      (candidate) => candidate.id === userId,
+    );
+    return Boolean(account && account.passwordHash !== fnosOnlyPasswordHash);
+  }
+
+  private async writePassword(
+    userId: string,
+    newPassword: string,
+    currentPassword?: string,
+  ): Promise<number> {
+    return this.runExclusive(async () => {
+      const validatedPassword = validateNewPassword(newPassword);
+      const database = await this.readDatabase();
+      const account = database.users.find((candidate) => candidate.id === userId);
+
+      if (!account) {
+        throw new AccountNotFoundError();
+      }
+
+      if (
+        account.id.startsWith("nas-") &&
+        account.passwordHash === fnosOnlyPasswordHash
+      ) {
+        const password = await hashPassword(validatedPassword);
+        account.passwordHash = password.hash;
+        account.passwordSalt = password.salt;
+        account.passwordVersion += 1;
+        account.skillTokenVersion += 1;
+        await this.writeDatabase(database);
+        return account.passwordVersion;
+      }
+
+      if (typeof currentPassword !== "string" || !currentPassword) {
+        throw new InvalidCurrentPasswordError();
       }
 
       if (
@@ -939,6 +1133,14 @@ function getSessionSecret(): string {
   }
 
   return runtimeSessionSecret;
+}
+
+// 原生模式的写操作令牌必须跨进程重启保持稳定：它是从持久化的会话密钥派生出来的，
+// 否则应用一升级/重启，页面里缓存的旧令牌就会让所有写请求报「写入校验失败」。
+export function createNativeCsrfToken(uid: number): string {
+  return createHmac("sha256", getSessionSecret())
+    .update(`fnnotes-native-csrf:${uid}`)
+    .digest("hex");
 }
 
 export function createSessionToken(

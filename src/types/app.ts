@@ -8,6 +8,37 @@ export type NoteCardThemeId =
   | "telegraph";
 export type ThemePreferenceId = ThemeId | "system";
 
+// 对齐官方 formatting_mode：0 纯文本、1 富文本、2 Markdown（本项目用字符串保存）。
+export type FormattingMode = "plain" | "rich" | "markdown";
+export type RichBlockStyle =
+  | "head"
+  | "ul"
+  | "ol"
+  | "todo"
+  | "todo_checked"
+  | "quote"
+  | "image"
+  | "hr";
+export type RichInlineStyle = "bold" | "italic" | "underline" | "strike" | "code";
+
+export interface RichLineStyle {
+  blocks: RichBlockStyle[];
+  center?: boolean;
+  head?: 1 | 2 | 3;
+}
+
+export interface RichInlineMark {
+  end: number;
+  start: number;
+  style: RichInlineStyle;
+}
+
+export interface RichTextContent {
+  inline: RichInlineMark[];
+  lineStyles: Record<number, RichLineStyle>;
+  text: string;
+}
+
 export type CopyState = "idle" | "copied" | "failed";
 
 export interface ThemeOption {
@@ -31,6 +62,9 @@ export interface NoteSection {
 export interface NoteDocument {
   id: string;
   markdown: string;
+  formattingMode?: FormattingMode;
+  richText?: RichTextContent | null;
+  fontScale?: number;
   createdAt: number;
   updatedAt: number;
   normalOrder: number;

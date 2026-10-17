@@ -45,6 +45,7 @@ const markdownComponents: Components = {
   ),
   code: ({ children, className }) => <code className={className}>{children}</code>,
   blockquote: ({ children }) => <blockquote>{children}</blockquote>,
+  u: ({ children }) => <u className="markdown-underline">{children}</u>,
 };
 
 const inlineMarkdownComponents: Components = {
@@ -64,6 +65,7 @@ type MarkdownAstNode = {
   value?: string;
   children?: MarkdownAstNode[];
   data?: {
+    hName?: string;
     hProperties?: {
       className?: string | string[];
     };
@@ -92,6 +94,68 @@ function withClassName(node: MarkdownAstNode, className: string): MarkdownAstNod
       },
     },
   };
+}
+
+// 官方便签用一对中括号表示居中一段文字（可任意行，也可与标题叠加）：
+// 这里在渲染层把它变成带 class 的段落，预览、PNG、公众号与归档共用同一份结果。
+function unwrapCenteredParagraph(node: MarkdownAstNode): MarkdownAstNode {
+  if (node.type !== "paragraph" || !Array.isArray(node.children)) {
+    return node;
+  }
+
+  const children = node.children;
+  const first = children[0];
+  const last = children[children.length - 1];
+
+  if (
+    !first ||
+    !last ||
+    first.type !== "text" ||
+    last.type !== "text" ||
+    typeof first.value !== "string" ||
+    typeof last.value !== "string"
+  ) {
+    return node;
+  }
+
+  if (!first.value.startsWith("[") || !last.value.endsWith("]")) {
+    return node;
+  }
+
+  const isSingleChild = children.length === 1;
+
+  // 只有整行都是 [文字] 才当成居中；行内的括号引用保持原样。
+  if (!isSingleChild && (first.value.includes("]") || last.value.includes("["))) {
+    return node;
+  }
+
+  const nextChildren = children.map((child) => ({ ...child }));
+
+  if (isSingleChild) {
+    const inner = first.value.slice(1, -1);
+
+    if (!inner.trim()) {
+      return node;
+    }
+
+    nextChildren[0] = { ...nextChildren[0], value: inner };
+  } else {
+    nextChildren[0] = { ...nextChildren[0], value: first.value.slice(1) };
+    nextChildren[nextChildren.length - 1] = {
+      ...nextChildren[nextChildren.length - 1],
+      value: last.value.slice(0, -1),
+    };
+  }
+
+  const kept = nextChildren.filter(
+    (child) => typeof child.value !== "string" || child.value.trim() !== "",
+  );
+
+  if (!kept.length) {
+    return node;
+  }
+
+  return withClassName({ ...node, children: kept }, "markdown-centered-line");
 }
 
 function splitParagraphByManualLines(node: MarkdownAstNode): MarkdownAstNode[] {
@@ -146,13 +210,63 @@ export function remarkManualLineParagraphs() {
         return;
       }
 
-      node.children = node.children.flatMap((child) => splitParagraphByManualLines(child));
+      node.children = node.children.flatMap((child) =>
+        splitUnderlineText(child),
+      );
+      // 先按手动换行拆段，再逐段判断居中：`[文字]` 只覆盖自己那一行。
+      node.children = node.children.flatMap((child) =>
+        splitParagraphByManualLines(child).map(unwrapCenteredParagraph),
+      );
 
       node.children.forEach(visit);
     }
 
     visit(tree);
   };
+}
+
+// 下划线沿用 Markdown Extra 的 `++文字++`（<ins>）约定：官方移动端有下划线，网页版没有语法可抄。
+const UNDERLINE_PATTERN = /(?<!\+)\+\+(?=\S)([^+\n]+?)(?<=\S)\+\+(?!\+)/g;
+
+function splitUnderlineText(node: MarkdownAstNode): MarkdownAstNode[] {
+  if (
+    node.type !== "text" ||
+    typeof node.value !== "string" ||
+    !node.value.includes("++")
+  ) {
+    return [node];
+  }
+
+  const text = node.value;
+  const parts: MarkdownAstNode[] = [];
+  let position = 0;
+  UNDERLINE_PATTERN.lastIndex = 0;
+
+  for (const match of text.matchAll(UNDERLINE_PATTERN)) {
+    const start = match.index ?? 0;
+
+    if (start > position) {
+      parts.push({ type: "text", value: text.slice(position, start) });
+    }
+
+    parts.push({
+      type: "underline",
+      value: match[1],
+      children: [{ type: "text", value: match[1] }],
+      data: { hName: "u" },
+    });
+    position = start + match[0].length;
+  }
+
+  if (!parts.length) {
+    return [node];
+  }
+
+  if (position < text.length) {
+    parts.push({ type: "text", value: text.slice(position) });
+  }
+
+  return parts;
 }
 
 export function MarkdownText({ children }: MarkdownTextProps) {
@@ -169,7 +283,7 @@ export function MarkdownText({ children }: MarkdownTextProps) {
 export function MarkdownInlineText({ children }: MarkdownInlineTextProps) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkManualLineParagraphs]}
       components={inlineMarkdownComponents}
     >
       {escapeLeadingBlockMarkdown(children)}

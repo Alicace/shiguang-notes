@@ -796,7 +796,7 @@ export function PromoStudioPage({ mode }: PromoStudioPageProps) {
     <div className="promo-studio-page">
       <header className="promo-studio-header">
         <div className="promo-studio-brand">
-          <a href="/" className="promo-home-link" aria-label="返回锤子便签">
+          <a href="/" className="promo-home-link" aria-label="返回拾光便签">
             <span className="promo-brand-dot" aria-hidden="true" />
             宣传截图工坊
           </a>

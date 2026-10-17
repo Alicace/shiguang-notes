@@ -1,17 +1,17 @@
 ## Description: <br>
-通过调用方明确配置的锤子便签 API 与 Token，完整查询、新增、更新、软删除、恢复和永久删除便签，并支持分类、星标、置顶、公众号富文本与 Markdown PNG 长图导出；Token 缺失时可用账号密码完成一次性授权。 <br>
+通过调用方明确配置的拾光便签 API 与 Token，完整查询、新增、更新、软删除、恢复和永久删除便签，并支持分类、星标、置顶、公众号富文本与 Markdown PNG 长图导出；Token 缺失时可用账号密码完成一次性授权。 <br>
 
 This skill is ready for commercial/non-commercial use. <br>
 
 ## Publisher: <br>
-[zhaoolee](https://clawhub.ai/zhaoolee) <br>
+[Alicace](https://github.com/Alicace) <br>
 
 ### License/Terms of Use: <br>
 MIT-0 <br>
 
 
 ## Use Case: <br>
-Developers and note-management users can manage an authenticated Smartisan Notes workspace through an explicitly configured API endpoint. The skill covers note CRUD, trash recovery and permanent deletion, folder classification, starring, pinning, WeChat-ready HTML generation, and PNG long-image export. <br>
+Developers and note-management users can manage an authenticated 拾光便签 workspace through an explicitly configured API endpoint. The skill covers note CRUD, trash recovery and permanent deletion, folder classification, starring, pinning, WeChat-ready HTML generation, and PNG long-image export. <br>
 
 ### Deployment Geography for Use: <br>
 Global <br>
@@ -27,8 +27,8 @@ Mitigation: Mutating commands use expectedUpdatedAt and retry against the latest
 
 ## Reference(s): <br>
 - [Workspace API and command reference](references/workspace-api.md) <br>
-- [ClawHub skill page](https://clawhub.ai/zhaoolee/skills/notes-export-api) <br>
-- [Source repository](https://github.com/zhaoolee/notes/tree/dev/skills/notes-export-api) <br>
+- [Source repository](https://github.com/Alicace/shiguang-notes/tree/main/skills/notes-export-api) <br>
+- [Upstream project](https://github.com/zhaoolee/notes) <br>
 
 
 ## Skill Output: <br>

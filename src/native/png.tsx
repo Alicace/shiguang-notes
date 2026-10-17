@@ -7,12 +7,13 @@ import type { NoteCardThemeId } from "../types/app.js";
 import { renderPng, savePng } from "../../fnos/m0/ui/png.js";
 import { recorder } from "../../fnos/m0/ui/diagnostics.js";
 
-export async function exportNativePng(markdown: string, theme: NoteCardThemeId, footer: { footerBrand: string; footerLogoUrl: string; footerVia: string }) {
+export async function exportNativePng(markdown: string, theme: NoteCardThemeId, footer: { footerBrand: string; footerLogoUrl: string; footerVia: string; fontScale?: number }) {
   recorder.action("png.generate");
   const container = document.createElement("div");
   container.className = "native-png-stage app-layout";
   container.dataset.theme = theme === "smartisan-dark" ? "smartisan-dark" : "default";
   container.setAttribute("aria-hidden", "true");
+  container.style.setProperty("--note-font-scale", String(footer.fontScale ?? 1));
   document.body.append(container);
   const root = createRoot(container);
   const controller = new AbortController();

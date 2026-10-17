@@ -48,8 +48,9 @@ test("设置页只保留长期偏好，不混入当前便签操作", () => {
   assert.match(html, /由测试发送/);
   assert.match(html, /via Feedback/);
   assert.match(html, /id="settings-pane-about"/);
-  assert.match(html, /开源地址/);
-  assert.match(html, /href="https:\/\/github\.com\/zhaoolee\/notes"/);
+  assert.match(html, /项目主页/);
+  assert.match(html, /href="https:\/\/github\.com\/Alicace\/shiguang-notes"/);
+  assert.match(html, /zhaoolee\/notes/);
   assert.match(html, /href="\/changelog"/);
   assert.match(html, /查看版本新增、变更和修复记录/);
   assert.match(html, /target="_blank"/);
@@ -188,15 +189,15 @@ test("底部显示设置提供四角格、Logo 上传、双文本编辑、恢复
     footerSource,
     /FOOTER_VIA_STORAGE_KEY = "notes\.footerVia"/,
   );
-  assert.equal(DEFAULT_FOOTER_BRAND, "由开源版锤子便签发送");
-  assert.equal(DEFAULT_FOOTER_VIA, "Powered by zhaoolee/notes");
+  assert.equal(DEFAULT_FOOTER_BRAND, "由拾光便签发送");
+  assert.equal(DEFAULT_FOOTER_VIA, "Powered by Alicace/shiguang-notes");
   assert.match(
     stateSource,
-    /storedBrand === LEGACY_DEFAULT_FOOTER_BRAND\s*\? DEFAULT_FOOTER_BRAND/,
+    /storedBrand === LEGACY_DEFAULT_FOOTER_BRAND \|\|\s*storedBrand === LEGACY_UPSTREAM_FOOTER_BRAND/,
   );
   assert.match(
     stateSource,
-    /storedVia === LEGACY_DEFAULT_FOOTER_VIA\s*\? DEFAULT_FOOTER_VIA/,
+    /storedVia === LEGACY_DEFAULT_FOOTER_VIA\s*\|\|\s*storedVia === LEGACY_UPSTREAM_FOOTER_VIA\s*\? DEFAULT_FOOTER_VIA/,
   );
   assert.match(
     stateSource,
@@ -204,7 +205,7 @@ test("底部显示设置提供四角格、Logo 上传、双文本编辑、恢复
   );
   assert.match(
     wechatSource,
-    /JSON\.stringify\(\{ markdown, theme, \.\.\.footer \}\)/,
+    /JSON\.stringify\(\{ fontScale, markdown, theme, \.\.\.footer \}\)/,
   );
   assert.match(
     styles,
@@ -572,7 +573,7 @@ test("移动详情页按原版区分编辑态和预览态操作", () => {
   const styles = readFileSync("src/styles.css", "utf8");
 
   assert.match(appSource, /className="mobile-detail-action mobile-insert-image"/);
-  assert.match(appSource, /className="mobile-detail-action mobile-edit-done"/);
+  assert.match(appSource, /className=\{`mobile-detail-action mobile-edit-done/);
   assert.match(appSource, /className="mobile-detail-action mobile-delete-note"/);
   assert.match(appSource, /className="share-trigger"/);
   assert.match(
@@ -596,4 +597,25 @@ test("移动详情页按原版区分编辑态和预览态操作", () => {
   ]) {
     assert.ok(existsSync(`public/smartisan/mobile/${file}`), `${file} 应存在`);
   }
+});
+
+test("用户管理放在账号与同步里，普通账号看不到这一段", () => {
+  const settingsPanel = readFileSync("src/components/SettingsPanel.tsx", "utf8");
+  const userManagement = readFileSync("src/native/UserManagement.tsx", "utf8");
+
+  // 账号相关功能归到「账号与同步」，共享空间与文件授权各自独立分类。
+  assert.match(settingsPanel, /id="settings-pane-account"[\s\S]*<UserManagement \/>/);
+  assert.match(settingsPanel, /\{ id: "spaces", label: "共享空间"/);
+  assert.match(settingsPanel, /\{ id: "files", label: "文件授权"/);
+  // 普通账号拿不到账号接口（403）时整段不渲染，而不是显示一个错误。
+  assert.match(userManagement, /error\.status === 403[\s\S]*setIsVisible\(false\)/);
+  for (const label of ["创建账号", "重置密码", "删除"]) {
+    assert.match(userManagement, new RegExp(`>\\s*${label}\\s*<`), `用户管理缺少「${label}」`);
+  }
+  // 停用/启用按状态切换文案。
+  assert.match(userManagement, /\?\s*"启用"\s*:\s*"停用"/);
+  // 两类租户在界面上必须可区分，并显示一次性密码供管理员转交。
+  assert.match(userManagement, /"独立账号"/);
+  assert.match(userManagement, /飞牛账号 · UID/);
+  assert.match(userManagement, /native-credential/);
 });

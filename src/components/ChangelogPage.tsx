@@ -99,14 +99,14 @@ export function ChangelogPage({ markdown }: ChangelogPageProps) {
     >
       <header className="app-topbar changelog-topbar">
         <div className="app-topbar-inner changelog-topbar-inner">
-          <a className="changelog-back" href="/" aria-label="返回锤子便签">
+          <a className="changelog-back" href="/" aria-label="返回拾光便签">
             <span className="mobile-back-icon" aria-hidden="true" />
           </a>
 
           <a className="app-brand changelog-brand" href="/">
             <span className="app-brand-mark" aria-hidden="true" />
             <span className="app-brand-copy">
-              <span className="app-brand-title">锤子便签</span>
+              <span className="app-brand-title">拾光便签</span>
             </span>
           </a>
 

@@ -39,6 +39,25 @@ export async function importImageFile(file: File): Promise<ImageImportResult> {
   return parseImportResponse(response);
 }
 
+// 读取 NAS 上已授权目录里的图片：服务端校验路径必须在授权目录内。
+export async function importNasImage(
+  absolutePath: string,
+): Promise<ImageImportResult> {
+  const response = await fetch("/api/fnos/read-image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: absolutePath }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readImportError(response));
+  }
+
+  const data = (await response.json()) as { dataUrl: string; filename: string };
+
+  return importImageUrl(data.dataUrl);
+}
+
 export async function importImageUrl(sourceUrl: string): Promise<ImageImportResult> {
   const payload: ImportByUrlPayload = {
     sourceUrl,

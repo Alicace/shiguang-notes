@@ -3,7 +3,7 @@ export const BASE = "/app/fnnotes-m0/";
 export const AUTH_STATE_KEY = "fnnotes-m0.authorization";
 
 export interface Session {
-  user: { uid: number; username: string; isAdmin: boolean };
+  user: { id: string; uid: number; username: string; isAdmin: boolean };
   csrfToken: string;
   prototype: boolean;
   simulation: boolean;
@@ -29,6 +29,6 @@ export async function api<T>(route: string, init: RequestInit = {}): Promise<T> 
     recorder.api(route, init.method || "GET", status, performance.now() - start);
   }
 }
-export function writeOptions(session: Session, body: unknown, method = "PUT"): RequestInit {
-  return { method, headers: { "Content-Type": "application/json", "X-Fnnotes-CSRF": session.csrfToken }, body: JSON.stringify(body) };
+export function writeOptions(session: Session, body: unknown, method = "PUT", extraHeaders: Record<string, string> = {}): RequestInit {
+  return { method, headers: { "Content-Type": "application/json", "X-Fnnotes-CSRF": session.csrfToken, "X-Shiguang-User": session.user.id, ...extraHeaders }, body: JSON.stringify(body) };
 }

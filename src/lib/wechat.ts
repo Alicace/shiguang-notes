@@ -46,13 +46,14 @@ async function prepareWechatArticle(
   markdown: string,
   theme: NoteCardThemeId,
   footer?: WechatFooterOptions,
+  fontScale = 1,
 ): Promise<WechatPreparationResult> {
   const response = await fetch("/api/wechat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ markdown, theme, ...footer }),
+    body: JSON.stringify({ fontScale, markdown, theme, ...footer }),
   });
 
   if (!response.ok) {
@@ -105,8 +106,9 @@ export async function copyMarkdownForWechat(
   markdown: string,
   theme: NoteCardThemeId,
   footer?: WechatFooterOptions,
+  fontScale = 1,
 ): Promise<WechatPreparationResult> {
-  const preparation = prepareWechatArticle(markdown, theme, footer);
+  const preparation = prepareWechatArticle(markdown, theme, footer, fontScale);
 
   if (
     typeof navigator !== "undefined" &&
@@ -146,6 +148,7 @@ export async function publishMarkdownAsWechatDraft(
   markdown: string,
   theme: NoteCardThemeId,
   footer?: WechatFooterOptions,
+  fontScale = 1,
 ): Promise<WechatDraftResult> {
   const response = await fetch("/api/wechat/draft", {
     method: "POST",
@@ -153,7 +156,7 @@ export async function publishMarkdownAsWechatDraft(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ markdown, theme, ...footer }),
+    body: JSON.stringify({ fontScale, markdown, theme, ...footer }),
   });
 
   if (!response.ok) {

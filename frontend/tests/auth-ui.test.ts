@@ -21,7 +21,7 @@ test("首页账号密码弹窗支持浏览器密码管理与记住登录", () =>
   );
 
   assert.match(html, /role="dialog"/);
-  assert.match(html, /锤子便签/);
+  assert.match(html, /拾光便签/);
   assert.match(html, /账号密码登录/);
   assert.doesNotMatch(html, /短信验证码登录/);
   assert.match(html, /placeholder="用户名或邮箱"/);
@@ -65,6 +65,60 @@ test("普通用户修改密码表单使用当前密码与新密码语义", () =>
   );
   assert.match(html, /minLength="8"/);
   assert.match(html, /其他设备需要使用新密码重新登录/);
+});
+
+test("原生应用登录页同时提供 NAS 登录与账号密码登录", () => {
+  const authorized: string[] = [];
+  const html = renderToStaticMarkup(
+    createElement(LoginDialog, {
+      title: "拾光便签",
+      note: "NAS 用户直接使用「使用 NAS 登录」。",
+      nasLogin: { onAuthorize: () => authorized.push("nas") },
+      login: async () => ({
+        id: "feedback-user",
+        role: "user" as const,
+        username: "feedback",
+      }),
+      onAuthenticated: () => undefined,
+    }),
+  );
+
+  assert.match(html, /拾光便签/);
+  assert.match(html, /账号密码登录/);
+  assert.match(html, /class="login-dialog-nas-button"/);
+  assert.match(html, /使用 NAS 登录/);
+  assert.match(html, /不收集 NAS 密码/);
+  assert.match(html, /NAS 用户直接使用「使用 NAS 登录」。/);
+  assert.doesNotMatch(html, /管理员凭据由服务端环境变量提供/);
+});
+
+test("原生登录页展示外部错误，并支持首次设置应用密码", () => {
+  const loginHtml = renderToStaticMarkup(
+    createElement(LoginDialog, {
+      error: "NAS 账号不属于当前飞牛用户。",
+      login: async () => ({
+        id: "feedback-user",
+        role: "user" as const,
+        username: "feedback",
+      }),
+      onAuthenticated: () => undefined,
+    }),
+  );
+  assert.match(loginHtml, /class="login-dialog-error" role="alert"/);
+  assert.match(loginHtml, /NAS 账号不属于当前飞牛用户。/);
+
+  const setupHtml = renderToStaticMarkup(
+    createElement(ChangePasswordDialog, {
+      changePassword: async () => undefined,
+      initialSetup: true,
+      onClose: () => undefined,
+    }),
+  );
+  assert.match(setupHtml, />设置应用密码</);
+  assert.match(setupHtml, /NAS 账号第一次设置应用密码不需要旧密码/);
+  assert.doesNotMatch(setupHtml, /name="currentPassword"/);
+  assert.match(setupHtml, /name="newPassword"/);
+  assert.match(setupHtml, /name="confirmPassword"/);
 });
 
 test("普通用户和 superadmin 都拥有云便签能力", () => {
@@ -120,7 +174,7 @@ test("superadmin 路由、用户管理和首页云同步入口保持连通", () 
   assert.match(appSource, /className="auth-trigger"/);
   assert.match(appSource, /className="auth-trigger-label"/);
   assert.match(appSource, /desktopFooter=\{desktopSidebarFooter\}/);
-  assert.match(appSource, /登录锤子便签/);
+  assert.match(appSource, /登录拾光便签/);
   assert.match(appSource, /账号：\$\{authUser\.username\}/);
   assert.match(appSource, /className="account-menu-summary"/);
   assert.match(appSource, /className="account-menu-item"/);

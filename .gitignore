@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-server
+dist-fnos
 .env
 dsh-plugin/node_modules
 storage/images/*
@@ -26,3 +27,4 @@ fnnotes-m0/app/ICON-SOURCE.md
 output/playwright/
 .playwright-cli/
 .DS_Store
+MEMORY/

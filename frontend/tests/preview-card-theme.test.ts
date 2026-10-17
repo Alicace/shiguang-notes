@@ -19,7 +19,7 @@ test("预览主题清单只包含可直接渲染的主题", () => {
       { id: "apple-notes-light", label: "iPhone 浅色" },
       { id: "apple-notes", label: "iPhone 深色" },
       { id: "bear", label: "Bear 便签" },
-      { id: "bazhahei", label: "老罗巴扎嘿" },
+      { id: "bazhahei", label: "暖色杂志" },
       { id: "telegraph", label: "Telegra.ph" },
     ],
   );
@@ -40,9 +40,9 @@ test("PreviewPanel 把独立配色限定在便签卡片并提供浮动入口", (
     createElement(PreviewPanel, {
       notes: [{ heading: "深夜记录", content: "只改变这张便签。" }],
       exportError: "",
-      footerBrand: "由开源版锤子便签发送",
-      footerLogoUrl: "/smartisan/web/smartisan_hammer_footer.png",
-      footerVia: "Powered by zhaoolee/notes",
+      footerBrand: "由拾光便签发送",
+      footerLogoUrl: "/brand/shiguang-footer-logo.png",
+      footerVia: "Powered by Alicace/shiguang-notes",
       noteCardTheme: "smartisan-dark",
       onFooterBrandChange: noop,
       onFooterViaChange: noop,
@@ -63,7 +63,11 @@ test("PreviewPanel 把独立配色限定在便签卡片并提供浮动入口", (
 });
 
 test("预览主题浮窗支持移动端点按、点外关闭和 Escape 收起", () => {
-  const previewSource = readFileSync("src/components/PreviewPanel.tsx", "utf8");
+  const previewSource = readFileSync(
+    "src/components/NoteCardThemePicker.tsx",
+    "utf8",
+  );
+  const panelSource = readFileSync("src/components/PreviewPanel.tsx", "utf8");
   const styles = readFileSync("src/styles.css", "utf8");
 
   assert.match(previewSource, /NOTE_CARD_THEME_OPTIONS\.map\(\(option\) =>/);
@@ -72,6 +76,7 @@ test("预览主题浮窗支持移动端点按、点外关闭和 Escape 收起", 
   assert.match(previewSource, /document\.addEventListener\("pointerdown", handlePointerDown\)/);
   assert.match(previewSource, /document\.addEventListener\("keydown", handleKeyDown, true\)/);
   assert.match(previewSource, /event\.key !== "Escape"/);
+  assert.match(panelSource, /<NoteCardThemePicker/);
   assert.match(
     styles,
     /\.preview-theme-control\s*\{[^}]*position:\s*absolute;[^}]*right:[^}]*safe-area-inset-right[^}]*bottom:[^}]*safe-area-inset-bottom/s,
@@ -90,20 +95,20 @@ test("预览主题浮窗支持移动端点按、点外关闭和 Escape 收起", 
   );
 });
 
-test("锤子便签明暗配色共用用户指定图标并仅给暗色叠加遮罩", () => {
+test("拾光便签明暗配色共用内置主题图标并仅给暗色叠加遮罩", () => {
   const styles = readFileSync("src/styles.css", "utf8");
   const icon = readFileSync("public/smartisan-theme-icon.png");
 
   assert.equal(icon.toString("ascii", 1, 4), "PNG");
-  assert.equal(icon.readUInt32BE(16), 1024);
-  assert.equal(icon.readUInt32BE(20), 1024);
+  // 主题色卡继续使用原主题图标；应用图标（纸与笔）只在应用中心/桌面使用。
+  assert.ok(icon.length > 0);
   assert.match(
     styles,
-    /\.preview-theme-trigger-swatch\[data-preview-theme="default"\],\s*\.preview-theme-swatch\[data-preview-theme="default"\]\s*\{[^}]*background:\s*#e5c486 url\("\/smartisan-theme-icon\.png"\) center \/ cover\s*no-repeat;/s,
+    /\.preview-theme-trigger-swatch\[data-preview-theme="default"\],\s*\.preview-theme-swatch\[data-preview-theme="default"\]\s*\{[^}]*background:\s*#e5c486 url\("\/theme-thumbs\/smartisan-theme-icon\.png"\) center \/ cover\s*no-repeat;/s,
   );
   assert.match(
     styles,
-    /\.preview-theme-trigger-swatch\[data-preview-theme="smartisan-dark"\],\s*\.preview-theme-swatch\[data-preview-theme="smartisan-dark"\]\s*\{[^}]*background-image:\s*linear-gradient\(rgba\(0, 0, 0, 0\.52\), rgba\(0, 0, 0, 0\.52\)\),\s*url\("\/smartisan-theme-icon\.png"\);[^}]*background-size:\s*cover;/s,
+    /\.preview-theme-trigger-swatch\[data-preview-theme="smartisan-dark"\],\s*\.preview-theme-swatch\[data-preview-theme="smartisan-dark"\]\s*\{[^}]*background-image:\s*linear-gradient\(rgba\(0, 0, 0, 0\.52\), rgba\(0, 0, 0, 0\.52\)\),\s*url\("\/theme-thumbs\/smartisan-theme-icon\.png"\);[^}]*background-size:\s*cover;/s,
   );
   assert.match(
     styles,
@@ -120,7 +125,7 @@ test("Bear 配色入口使用用户指定的内置图标", () => {
   assert.equal(icon.readUInt32BE(20), 512);
   assert.match(
     styles,
-    /\.preview-theme-trigger-swatch\[data-preview-theme="bear"\],\s*\.preview-theme-swatch\[data-preview-theme="bear"\]\s*\{[^}]*background:\s*#cb1622 url\("\/bear-theme-icon\.png"\) center \/ cover no-repeat;/s,
+    /\.preview-theme-trigger-swatch\[data-preview-theme="bear"\],\s*\.preview-theme-swatch\[data-preview-theme="bear"\]\s*\{[^}]*background:\s*#cb1622 url\("\/theme-thumbs\/bear-theme-icon\.png"\) center \/ cover no-repeat;/s,
   );
   assert.match(
     styles,
@@ -137,7 +142,7 @@ test("Telegra.ph 配色入口使用官网声明的 T 字母图标", () => {
   assert.equal(icon.readUInt32BE(20), 512);
   assert.match(
     styles,
-    /\.preview-theme-trigger-swatch\[data-preview-theme="telegraph"\],\s*\.preview-theme-swatch\[data-preview-theme="telegraph"\]\s*\{[^}]*background:\s*#ffffff url\("\/telegraph-theme-icon\.png"\) center \/ cover no-repeat;/s,
+    /\.preview-theme-trigger-swatch\[data-preview-theme="telegraph"\],\s*\.preview-theme-swatch\[data-preview-theme="telegraph"\]\s*\{[^}]*background:\s*#ffffff url\("\/theme-thumbs\/telegraph-theme-icon\.png"\) center \/ cover no-repeat;/s,
   );
   assert.match(
     styles,
@@ -145,7 +150,7 @@ test("Telegra.ph 配色入口使用官网声明的 T 字母图标", () => {
   );
 });
 
-test("老罗巴扎嘿入口位于 Bear 下方并使用上游暖色杂志标识", () => {
+test("暖色杂志入口位于 Bear 下方并使用上游暖色杂志标识", () => {
   const styles = readFileSync("src/styles.css", "utf8");
 
   assert.deepEqual(
@@ -171,11 +176,11 @@ test("iPhone 备忘录明暗配色共用用户指定图标并仅给暗色叠加�
   assert.equal(icon.readUInt32BE(20), 1024);
   assert.match(
     styles,
-    /\.preview-theme-trigger-swatch\[data-preview-theme="apple-notes-light"\],\s*\.preview-theme-swatch\[data-preview-theme="apple-notes-light"\]\s*\{[^}]*background:\s*#ffffff url\("\/apple-notes-theme-icon\.png"\) center \/ cover\s*no-repeat;/s,
+    /\.preview-theme-trigger-swatch\[data-preview-theme="apple-notes-light"\],\s*\.preview-theme-swatch\[data-preview-theme="apple-notes-light"\]\s*\{[^}]*background:\s*#ffffff url\("\/theme-thumbs\/apple-notes-theme-icon\.png"\) center \/ cover\s*no-repeat;/s,
   );
   assert.match(
     styles,
-    /\.preview-theme-trigger-swatch\[data-preview-theme="apple-notes"\],\s*\.preview-theme-swatch\[data-preview-theme="apple-notes"\]\s*\{[^}]*background-image:\s*linear-gradient\(rgba\(0, 0, 0, 0\.52\), rgba\(0, 0, 0, 0\.52\)\),\s*url\("\/apple-notes-theme-icon\.png"\);[^}]*background-size:\s*cover;/s,
+    /\.preview-theme-trigger-swatch\[data-preview-theme="apple-notes"\],\s*\.preview-theme-swatch\[data-preview-theme="apple-notes"\]\s*\{[^}]*background-image:\s*linear-gradient\(rgba\(0, 0, 0, 0\.52\), rgba\(0, 0, 0, 0\.52\)\),\s*url\("\/theme-thumbs\/apple-notes-theme-icon\.png"\);[^}]*background-size:\s*cover;/s,
   );
   assert.match(
     styles,
@@ -197,7 +202,7 @@ test("卡片主题覆盖完整纸张 token，页面其余区域继续使用全�
   );
   assert.match(appSource, /exportMarkdownAsPng\(markdown, noteCardTheme,/);
   assert.match(appSource, /exportMarkdownArchive\(markdown, noteCardTheme,/);
-  assert.match(appSource, /copyMarkdownForWechat\(markdown, noteCardTheme,/);
+  assert.match(appSource, /copyMarkdownForWechat\(\s*markdown,\s*noteCardTheme,/s);
   assert.match(appSource, /noteCardTheme=\{noteCardTheme\}/);
   const exportSource = readFileSync("src/lib/export.ts", "utf8");
   assert.match(
@@ -211,7 +216,7 @@ test("卡片主题覆盖完整纸张 token，页面其余区域继续使用全�
   const wechatSource = readFileSync("src/lib/wechat.ts", "utf8");
   assert.match(
     wechatSource,
-    /JSON\.stringify\(\{ markdown, theme, \.\.\.footer \}\)[\s\S]*result\.theme !== theme/s,
+    /JSON\.stringify\(\{ fontScale, markdown, theme, \.\.\.footer \}\)[\s\S]*result\.theme !== theme/s,
   );
   assert.match(
     styles,

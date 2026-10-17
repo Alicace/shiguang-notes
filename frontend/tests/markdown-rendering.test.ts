@@ -18,6 +18,7 @@ import {
   NOTE_CARD_THEME_STYLES,
 } from "../../src/lib/note-card-theme-styles.js";
 import type { NoteCardThemeId } from "../../src/types/app.js";
+import { MarkdownText } from "../../src/components/MarkdownText.js";
 
 function readRgbaPngAlpha(
   png: Buffer,
@@ -452,11 +453,27 @@ test("WechatArticle 明暗纸框不触发微信表格加工且只包含双框和
   }
 });
 
+test("公众号对正文中间的中括号居中行输出内联居中样式", () => {
+  const html = renderToStaticMarkup(
+    createElement(WechatArticle, {
+      footerBrand: "由方圆小站发送",
+      footerHammerUrl: "https://cdn.example.com/shiguang-footer-logo.png",
+      footerVia: "via Notes Skill",
+      theme: "default",
+      markdown: "第一段普通文字。\n\n[中间居中行]\n\n第三段普通文字。",
+    }),
+  );
+
+  assert.match(html, /text-align:center">中间居中行<\/p>/);
+  assert.doesNotMatch(html, /\[中间居中行\]/);
+  assert.match(html, />第一段普通文字。<\/p>/);
+});
+
 test("WechatArticle 生成公众号可粘贴的内联样式富文本", () => {
   const html = renderToStaticMarkup(
     createElement(WechatArticle, {
       footerBrand: "由方圆小站发送",
-      footerHammerUrl: "https://cdn.example.com/smartisan-hammer.png",
+      footerHammerUrl: "https://cdn.example.com/shiguang-footer-logo.png",
       footerVia: "via Notes Skill",
       theme: "default",
       markdown: [
@@ -483,7 +500,7 @@ test("WechatArticle 生成公众号可粘贴的内联样式富文本", () => {
     }),
   );
 
-  assert.match(html, /data-tool="开源版锤子便签"/);
+  assert.match(html, /data-tool="拾光便签"/);
   assert.match(html, /data-note-card-theme="default"/);
   assert.match(html, /data-smartisan-theme="default"/);
   assert.match(
@@ -594,30 +611,30 @@ test("WechatArticle 生成公众号可粘贴的内联样式富文本", () => {
   );
   assert.doesNotMatch(html, /<footer(?:\s|>)/);
   assert.doesNotMatch(html, /<table data-smartisan-footer="true"/);
-  assert.match(html, /data-smartisan-hammer="true"/);
+  assert.match(html, /data-note-logotype="true"/);
   assert.match(
     html,
-    /src="https:\/\/cdn\.example\.com\/smartisan-hammer\.png"/,
+    /src="https:\/\/cdn\.example\.com\/shiguang-footer-logo\.png"/,
   );
   assert.match(
     html,
-    /data-smartisan-hammer="true"[^>]*border-radius:50%;background-color:transparent;object-fit:contain/,
+    /data-note-logotype="true"[^>]*border-radius:50%;background-color:transparent;object-fit:contain/,
   );
-  const footerHammerAsset = readFileSync(
-    "public/smartisan/web/smartisan_hammer_footer.png",
+  const footerLogoAsset = readFileSync(
+    "public/brand/shiguang-footer-logo.png",
   );
-  const footerHammerHash = createHash("sha256")
-    .update(footerHammerAsset)
+  const footerLogoHash = createHash("sha256")
+    .update(footerLogoAsset)
     .digest("hex");
   const serverSource = readFileSync("server/index.ts", "utf8");
-  const pngColorType = footerHammerAsset[25];
-  assert.equal(footerHammerAsset.readUInt32BE(16), 48);
-  assert.equal(footerHammerAsset.readUInt32BE(20), 48);
+  const pngColorType = footerLogoAsset[25];
+  assert.equal(footerLogoAsset.readUInt32BE(16), 48);
+  assert.equal(footerLogoAsset.readUInt32BE(20), 48);
   assert.ok(
     pngColorType === 4 ||
       pngColorType === 6 ||
-      footerHammerAsset.includes(Buffer.from("tRNS")),
-    "公众号底部锤子标识必须包含透明通道，避免暗黑模式出现浅色方块",
+      footerLogoAsset.includes(Buffer.from("tRNS")),
+    "公众号底部页脚标志必须包含透明通道，避免暗黑模式出现浅色方块",
   );
   for (const [x, y] of [
     [0, 0],
@@ -626,21 +643,20 @@ test("WechatArticle 生成公众号可粘贴的内联样式富文本", () => {
     [47, 47],
   ]) {
     assert.equal(
-      readRgbaPngAlpha(footerHammerAsset, x, y),
+      readRgbaPngAlpha(footerLogoAsset, x, y),
       0,
-      `锤子标识四角必须透明：${x},${y}`,
+      `页脚标志四角必须透明：${x},${y}`,
     );
   }
   assert.equal(
-    footerHammerHash,
-    "b5d3bd9587fa9a1226b25a0709ff61a450df29d96ca2f127c6afc0b8e193a60e",
+    footerLogoHash,
+    "59272e449bbf05320e62afe878b964d6da39092f98a335c1e17ba9f2f1e57a2f",
   );
-  assert.match(
-    serverSource,
-    new RegExp(
-      `https://notes\\.fangyuanxiaozhan\\.com/images/${footerHammerHash}\\.png`,
-    ),
-  );
+  // 公众号默认页脚不再内嵌任何外部图片：留空即纯文字页脚，
+  // 需要图片时由用户配置自己的图床（WECHAT_FOOTER_LOGO_URL 或自定义页脚 Logo）。
+  assert.match(serverSource, /const defaultWechatFooterLogoUrl = "";/);
+  assert.match(serverSource, /process\.env\.WECHAT_FOOTER_LOGO_URL\?\.trim\(\)/);
+  assert.doesNotMatch(serverSource, /notes\.fangyuanxiaozhan\.com/);
   assert.doesNotMatch(html, /src="data:/);
   assert.doesNotMatch(html, /<li[^>]*>\s*<\/li>/);
   assert.doesNotMatch(html, /\[公众号居中正文\]/);
@@ -711,7 +727,7 @@ test("WechatArticle 为七种卡片主题生成互不共享的内联配色", () 
   }
 });
 
-test("WechatArticle 为老罗巴扎嘿保留暖色杂志排版", () => {
+test("WechatArticle 为暖色杂志主题保留暖色排版", () => {
   assert.equal(
     NOTE_CARD_THEME_STYLES.bazhahei.fontFamily,
     NOTE_CARD_THEME_STYLES.default.fontFamily,
@@ -723,7 +739,7 @@ test("WechatArticle 为老罗巴扎嘿保留暖色杂志排版", () => {
 
   const html = renderToStaticMarkup(
     createElement(WechatArticle, {
-      footerBrand: "老罗巴扎嘿排版测试",
+      footerBrand: "暖色杂志排版测试",
       footerHammerUrl: "https://cdn.example.com/hammer.png",
       footerVia: "via Feedback",
       markdown: "# 杂志标题\n\n## 核心判断\n\n> 摘要卡片\n\n正文与**重点**、[链接](https://example.com)",
@@ -821,7 +837,7 @@ test("WechatArticle 长文只在段落重复微信需要的字号与行高且不
   const html = renderToStaticMarkup(
     createElement(WechatArticle, {
       footerBrand: "由方圆小站发送",
-      footerHammerUrl: "https://cdn.example.com/smartisan-hammer.png",
+      footerHammerUrl: "https://cdn.example.com/shiguang-footer-logo.png",
       footerVia: "via Notes Skill",
       markdown,
       theme: "apple-notes",
@@ -1488,4 +1504,78 @@ test("WechatArticle 的大引号行高不小于字号且 Bear 标记保持 18px"
   assert.match(bearMark[1], /width:18px/);
   assert.match(bearMark[1], /font-size:18px/);
   assert.match(bearMark[1], /line-height:18px/);
+});
+
+// 官方便签用一对中括号表示居中一段文字（任意行，可与标题叠加）。
+test("中括号居中在任意行生效，行内引用不受影响", () => {
+  const html = renderToStaticMarkup(
+    createElement(
+      MarkdownText,
+      null,
+      "第一行\n\n[居中一行]\n\n[**加粗居中**]\n\n参见 [附录] 一节",
+    ),
+  );
+
+  assert.match(html, /<p class="markdown-centered-line">居中一行<\/p>/);
+  assert.match(
+    html,
+    /<p class="markdown-centered-line"><strong>加粗居中<\/strong><\/p>/,
+  );
+  assert.match(html, /<p>参见 \[附录\] 一节<\/p>/);
+  assert.doesNotMatch(html, /\[居中一行\]/);
+});
+
+test("只有整行都是中括号才居中，残缺括号保持原文", () => {
+  const html = renderToStaticMarkup(
+    createElement(MarkdownText, null, "[没闭合\n\n[]\n\n[ ]"),
+  );
+
+  assert.doesNotMatch(html, /markdown-centered-line/);
+  assert.match(html, /\[没闭合/);
+});
+
+test("下划线标记在预览与公众号里都渲染成下划线", () => {
+  const preview = renderToStaticMarkup(
+    createElement(MarkdownText, null, "普通 ++下划线++ 文字"),
+  );
+  assert.match(
+    preview,
+    /<u class="markdown-underline">下划线<\/u>/,
+  );
+  assert.doesNotMatch(preview, /\+\+下划线\+\+/);
+
+  const wechat = renderToStaticMarkup(
+    createElement(WechatArticle, {
+      footerBrand: "由方圆小站发送",
+      footerHammerUrl: "https://cdn.example.com/shiguang-footer-logo.png",
+      footerVia: "via Notes Skill",
+      theme: "default",
+      markdown: "正文 ++下划线++ 结束",
+    }),
+  );
+  assert.match(wechat, /text-decoration:underline">下划线<\/span>/);
+  assert.doesNotMatch(wechat, /<u[ >]/);
+});
+
+test("便签字号档位同时作用于公众号正文与标题", () => {
+  const render = (fontScale: number) =>
+    renderToStaticMarkup(
+      createElement(WechatArticle, {
+        fontScale,
+        footerBrand: "由方圆小站发送",
+        footerHammerUrl: "https://cdn.example.com/shiguang-footer-logo.png",
+        footerVia: "via Notes Skill",
+        theme: "default",
+        markdown: "第一段正文\n\n## 小结标题\n\n第二段正文",
+      }),
+    );
+  const base = render(1);
+  const large = render(1.3);
+
+  assert.match(base, /font-size:15px/);
+  assert.match(large, /font-size:19\.5px/);
+  assert.doesNotMatch(large, /font-size:15px/);
+  // 标题也按同一档位缩放。
+  assert.match(base, /font-size:17px/);
+  assert.match(large, /font-size:22\.1px/);
 });

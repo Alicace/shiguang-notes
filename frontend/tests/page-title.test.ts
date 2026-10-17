@@ -11,7 +11,7 @@ import {
 test("域名访问使用线上标题", () => {
   assert.equal(getPageTitle("notes.fangyuanxiaozhan.com"), DOMAIN_PAGE_TITLE);
   assert.equal(getPageTitle("localhost"), DOMAIN_PAGE_TITLE);
-  assert.equal(DOMAIN_PAGE_TITLE, "开源版锤子便签");
+  assert.equal(DOMAIN_PAGE_TITLE, "拾光便签");
 });
 
 test("IPv4 和 IPv6 地址访问使用本地化标题", () => {
@@ -19,7 +19,7 @@ test("IPv4 和 IPv6 地址访问使用本地化标题", () => {
   assert.equal(getPageTitle("192.168.1.23"), IP_PAGE_TITLE);
   assert.equal(getPageTitle("[::1]"), IP_PAGE_TITLE);
   assert.equal(getPageTitle("2001:db8::1"), IP_PAGE_TITLE);
-  assert.equal(IP_PAGE_TITLE, "本地化开源版锤子便签");
+  assert.equal(IP_PAGE_TITLE, "本地化拾光便签");
 });
 
 test("类似 IP 的无效域名不会被误判", () => {

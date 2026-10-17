@@ -316,9 +316,16 @@ body,
     box-shadow 220ms ease;
 }
 
+.app-layout {
+  /* 便签字号档位（官方移动端 A+/A-）：编辑器行高与字号、便签正文一起缩放。 */
+  --editor-line-height: calc(50px * var(--note-font-scale, 1));
+  --editor-font-size: calc(17px * var(--note-font-scale, 1));
+}
+
 .app-topbar {
   position: relative;
-  z-index: 2;
+  /* 必须高于工作区状态栏（z-index 4）与纸张列，否则顶栏里的主题浮层会被它们盖住。 */
+  z-index: 6;
   background:
     linear-gradient(180deg, #827265, #716053),
     url("/smartisan/web/bar-bg_4cfb4d66ed.png") repeat-x;
@@ -416,6 +423,21 @@ body,
 .desktop-toolbar-button:hover {
   border-color: #4f4135;
   background: linear-gradient(#8e7968, #7e6c5e);
+}
+
+.desktop-workspace-view-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.desktop-workspace-view-toggle.is-preview {
+  border-color: #6e5a45;
+  background: linear-gradient(#8b745e, #776250);
 }
 
 .smartisan-toolbar-icon {
@@ -662,6 +684,13 @@ body,
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.55;
+}
+
+.settings-native-note {
+  margin: -10px 0 22px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.6;
 }
 
 .settings-group + .settings-group {
@@ -2009,20 +2038,163 @@ body,
   line-height: 49px;
 }
 
-.desktop-view-switch {
-  position: relative;
-  width: 125px;
-  height: 24px;
-  flex: 0 0 125px;
+.mobile-scope-chip {
+  padding: 2px 7px;
+  flex: 0 0 auto;
+  border: 1px solid var(--note-list-divider);
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
 }
 
-.desktop-view-switch-trigger {
+.mobile-format-mode {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.mobile-format-mode-trigger {
+  min-width: 54px;
+  height: 28px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  grid-template-columns: none;
+  gap: 7px;
+  border: 1px solid var(--note-list-divider);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--note-list-time);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 26px;
+}
+
+.mobile-format-mode-trigger:disabled {
+  opacity: 0.45;
+}
+
+.mobile-format-size-row {
+  min-height: 42px;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid #eee7dd;
+}
+
+.mobile-format-size-row button {
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--note-list-divider);
+  border-top: 1px solid var(--note-list-divider);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--note-list-time);
+}
+
+.mobile-format-size-row span {
+  color: var(--note-list-time);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.mobile-font-scale {
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.mobile-font-scale button {
+  min-width: 34px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--note-list-divider);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--note-list-time);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.mobile-font-scale button:disabled {
+  opacity: 0.45;
+}
+
+.desktop-font-scale {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.desktop-font-scale-button {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--note-list-divider);
+  border-radius: 3px;
+  background: var(--note-list-surface);
+  color: var(--note-list-time);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.desktop-font-scale-button:hover:not(:disabled) {
+  border-color: var(--column-divider);
+  color: var(--note-list-title);
+}
+
+.desktop-font-scale-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (max-width: 1180px) {
+  .desktop-note-status .desktop-focus-toggle {
+    display: none;
+  }
+}
+
+@media (max-width: 1024px) {
+  .desktop-note-status .desktop-note-folder,
+  .desktop-note-status > span {
+    display: none;
+  }
+}
+
+.desktop-format-mode {
+  position: relative;
+  /* 宽度按最长档位「Markdown 模式」定死：切档时状态栏不跳动，标签也不会被裁掉。 */
+  width: 170px;
+  height: 24px;
+  flex: 0 0 170px;
+}
+
+.desktop-format-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.desktop-format-mode-trigger {
   width: 100%;
   height: 24px;
   padding: 0 9px 0 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   border: 1px solid var(--note-list-divider);
   border-radius: 2px;
   outline: 0;
@@ -2033,13 +2205,64 @@ body,
   font-weight: 400;
   line-height: 22px;
   text-align: left;
+  white-space: nowrap;
 }
 
-.desktop-view-switch-trigger:hover,
-.desktop-view-switch-trigger:focus-visible,
-.desktop-view-switch-trigger[aria-expanded="true"] {
+.desktop-format-mode-trigger .desktop-view-switch-arrow {
+  margin-left: auto;
+}
+
+.desktop-format-mode-trigger:hover,
+.desktop-format-mode-trigger:focus-visible,
+.desktop-format-mode-trigger[aria-expanded="true"] {
   border-color: var(--column-divider);
   color: var(--note-list-title);
+}
+
+/* 排版模式标识：与官方选单一致，RTF / M↓ 常驻在状态栏与菜单项里。 */
+.format-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 20px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--note-list-time) 16%, transparent);
+  color: var(--note-list-time);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.format-mode-badge svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.4;
+}
+
+.format-mode-badge.is-rich {
+  background: rgba(214, 176, 108, 0.28);
+  color: #8a6a2f;
+}
+
+.format-mode-badge.is-markdown {
+  background: rgba(146, 196, 120, 0.26);
+  color: #46692f;
+}
+
+.desktop-format-mode-trigger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.desktop-format-mode .desktop-view-menu {
+  right: auto;
+  left: 0;
 }
 
 .desktop-view-switch-arrow {
@@ -2058,21 +2281,20 @@ body,
   z-index: 10;
   top: 32px;
   left: 0;
-  width: 202px;
-  min-height: 110px;
-  padding: 2px 0;
+  width: 216px;
+  padding: 4px 0;
   overflow: hidden;
   border: 1px solid #e2dcd6;
-  border-radius: 5px;
+  border-radius: 6px;
   background: #fff;
   box-shadow: 0 8px 15px rgba(58, 45, 35, 0.15);
 }
 
 .desktop-view-menu button {
   width: 100%;
-  height: 52px;
-  min-height: 52px;
-  padding: 0 14px 0 10px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 14px 0 12px;
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
   align-items: center;
@@ -2081,8 +2303,13 @@ body,
   color: #625752;
   font-family: inherit;
   font-size: 13px;
-  line-height: 52px;
+  line-height: 44px;
   text-align: left;
+}
+
+/* 官方选单每一项之间有细分隔线，档位多了也不糊成一片。 */
+.desktop-view-menu button + button {
+  border-top: 1px solid #eee7dd;
 }
 
 .desktop-view-menu button:hover,
@@ -2099,15 +2326,73 @@ body,
   font-size: 12px;
 }
 
+/* 排版模式选单多一列模式标识：勾选、RTF/M↓、名称各占一列，避免折成两行。 */
+.desktop-format-mode .desktop-view-menu button {
+  grid-template-columns: 18px 34px minmax(0, 1fr);
+  column-gap: 10px;
+}
+
+.desktop-format-mode .desktop-view-menu .format-mode-badge {
+  justify-self: start;
+}
+
 .desktop-note-status {
   min-width: 0;
-  margin-left: auto;
+  /* 不允许被顶栏其它项压缩：否则窄窗口下右侧的排版模式会被自身 overflow 裁掉。 */
+  flex: 0 0 auto;
+  /* 工具栏向排版模式一侧靠拢，给右侧后续功能留出稳定空白。 */
+  margin-left: clamp(8px, 1vw, 16px);
+  margin-right: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
-  overflow: hidden;
+  gap: 12px;
+  /* 横向仍然截断，纵向放开：「排版模式」下拉挂在行内，overflow:hidden 会把
+     它整块裁掉（只剩几像素），菜单点不到。 */
+  overflow-x: clip;
+  overflow-y: visible;
   color: var(--note-list-time);
   white-space: nowrap;
+}
+
+/* 顶栏加星按钮：与分类栏同一张图标表，选中态换成实心金。 */
+.desktop-note-star {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--note-list-time);
+  cursor: pointer;
+}
+
+.desktop-note-star-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  background-image: url("/smartisan/web/all_icons_ab3d0991b9.png");
+  background-repeat: no-repeat;
+  background-position: -95px -310px;
+  opacity: 0.6;
+}
+
+.desktop-note-star:hover:not(:disabled),
+.desktop-note-star:focus-visible {
+  background: color-mix(in srgb, var(--note-list-title) 8%, transparent);
+}
+
+.desktop-note-star.is-starred .desktop-note-star-icon {
+  background-position: -60px -310px;
+  opacity: 1;
+}
+
+.desktop-note-star:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .desktop-note-folder {
@@ -2115,6 +2400,35 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 5px;
+}
+
+/* 状态栏分组：窄窗口时可以整组让位，避免富文本工具栏把右侧控件挤出可视区。 */
+.desktop-note-scale,
+.desktop-note-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+/* 状态栏宽度有限：先收起日期/字数，再收起字号档位与文件夹。
+   阈值按实测的可用宽度定：只要日期/字数还在，右侧控件就会被挤出可视区。 */
+@media (max-width: 1720px) {
+  .desktop-note-meta {
+    display: none;
+  }
+}
+
+@media (max-width: 1340px) {
+  .desktop-note-scale {
+    display: none;
+  }
+}
+
+@media (max-width: 1120px) {
+  .desktop-note-folder {
+    display: none;
+  }
 }
 
 .desktop-note-folder-icon,
@@ -2266,12 +2580,6 @@ body,
     gap: 14px;
   }
 
-  .app-layout[data-desktop-focus="true"] .desktop-view-switch {
-    margin-left: calc(
-      (100vw - var(--desktop-focus-paper-width)) / 2 - 75px
-    );
-  }
-
   .app-layout[data-desktop-focus="true"] .desktop-focus-exit {
     display: inline-flex;
   }
@@ -2304,7 +2612,9 @@ body,
   .desktop-left-actions {
     position: absolute;
     top: 12px;
-    left: calc(var(--category-sidebar-width) + var(--note-sidebar-width) - 165px);
+    right: calc(
+      100% - var(--category-sidebar-width) - var(--note-sidebar-width) + 14px
+    );
     display: flex;
     gap: 14px;
   }
@@ -3191,6 +3501,8 @@ body,
   overflow-anchor: none;
   background: #fbf7ed url("/smartisan/web/grid_6e4a41eefc.png") repeat;
   background-attachment: local;
+  /* 纸张底纹是 36×50 的横线条：高度必须跟着行高缩放，否则 A± 之后文字和横线会错位。 */
+  background-size: auto var(--editor-line-height);
   overscroll-behavior: contain;
 }
 
@@ -3238,6 +3550,15 @@ body,
 
 :root[data-theme="smartisan-dark"] .markdown-editor-flow {
   background: #1c1a1c;
+}
+
+:root[data-theme="smartisan-dark"] .rich-editor-surface .cm-scroller {
+  background: #1c1a1c;
+}
+
+:root[data-theme="smartisan-dark"] .rich-editor-surface::before {
+  border-right-color: #282828;
+  background: #161416;
 }
 
 .markdown-editor:focus {
@@ -3652,6 +3973,415 @@ body,
 
 .markdown-quick-input {
   display: none;
+}
+
+.desktop-insert-image-wrap { position: relative; display: inline-flex; }
+.image-source-menu { top: 34px; left: 0; width: 128px; min-height: 0; padding: 3px 0; }
+.image-source-menu button { height: 40px; min-height: 40px; padding: 0 12px; display: flex; align-items: center; grid-template-columns: none; font-size: 13px; }
+.image-source-menu button:hover { background: #f4f0e9; }
+.image-source-menu button > span { color: #625752; font-size: 13px; }
+
+.editor-rich-toolbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 6px;
+  min-width: 0;
+  --rich-toolbar-button: 24px;
+}
+
+.editor-rich-toolbar-label {
+  display: none;
+}
+
+.editor-rich-heading-menu,
+.editor-rich-more-menu {
+  position: absolute;
+  z-index: 30;
+  padding: 5px;
+  border: 1px solid #ded6ca;
+  border-radius: 7px;
+  background: #fffdf8;
+  box-shadow: 0 8px 20px rgba(58, 45, 35, 0.16);
+}
+
+.editor-rich-heading-menu {
+  top: 32px;
+  left: 0;
+  width: 116px;
+}
+
+.editor-rich-toolbar .editor-rich-heading-menu button,
+.editor-rich-toolbar .editor-rich-more-menu button {
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 36px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--note-list-title);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.editor-rich-toolbar .editor-rich-heading-menu button:hover,
+.editor-rich-toolbar .editor-rich-heading-menu button[aria-checked="true"],
+.editor-rich-toolbar .editor-rich-more-menu button:hover,
+.editor-rich-toolbar .editor-rich-more-menu button.is-active {
+  background: #f3eee6;
+}
+
+.editor-rich-more-menu {
+  right: 0;
+  bottom: calc(100% + 6px);
+  width: 196px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.editor-rich-toolbar .editor-rich-more-menu button svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+/* 富文本内核（CodeMirror 风格）：编辑面直接呈现行样式与行内加粗。 */
+.rich-editor-surface {
+  position: relative;
+  --editor-paper-scroll-y: 0px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  font-family: var(--ui-font);
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
+  color: var(--ink);
+  background: transparent;
+}
+
+/* 左侧纸张边条：与 Markdown 模式同一张图，随正文滚动保持横线相位。 */
+.rich-editor-surface::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0 auto 0 0;
+  width: var(--editor-gutter-width, 25px);
+  border-right: 1px solid #e8e2d7;
+  background: url("/smartisan/web/edge_004e88bdf2.png") repeat;
+  background-position:
+    0 calc(var(--editor-paper-scroll-y) + var(--editor-rule-offset-y));
+  background-size: 5px var(--editor-line-height);
+  pointer-events: none;
+}
+
+.rich-editor-surface.drag-active::after {
+  content: "松手即可导入图片";
+  position: absolute;
+  z-index: 5;
+  inset: 12px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed color-mix(in srgb, var(--ink) 30%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--note-list-surface) 88%, transparent);
+  color: var(--note-list-title);
+  font-family: var(--ui-font);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.rich-editor-surface .cm-scroller {
+  font: inherit;
+  padding: 0 46px 80px 50px;
+  line-height: var(--editor-line-height);
+  /* 纸张横线画在滚动容器上并随内容滚动，正文才会一直压在横线上。 */
+  background:
+    #fbf7ed url("/smartisan/web/grid_6e4a41eefc.png") repeat;
+  background-attachment: local;
+  background-size: auto var(--editor-line-height);
+}
+
+.rich-editor-surface .cm-editor {
+  height: 100%;
+  font: inherit;
+  background: transparent;
+}
+
+.rich-editor-surface .cm-editor.cm-focused {
+  outline: none;
+}
+
+.rich-editor-surface .cm-content {
+  font: inherit;
+  line-height: var(--editor-line-height);
+  caret-color: var(--ink);
+  padding: 0;
+}
+
+.rich-editor-surface .cm-line {
+  padding: 0;
+}
+
+.rich-editor-surface .rtf-bold {
+  font-weight: 700;
+}
+
+.rich-editor-surface .rtf-italic {
+  font-style: italic;
+}
+
+.rich-editor-surface .rtf-underline {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.rich-editor-surface .rtf-strike {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.rich-editor-surface .rtf-code {
+  padding: 0 0.22em;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--muted) 13%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.rich-editor-surface .rtf-image-line {
+  padding: 6px 0;
+}
+
+.rich-editor-surface .rtf-image {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.rich-editor-surface .rtf-image img {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 3px;
+  vertical-align: bottom;
+}
+
+.rich-editor-surface .rtf-head-1 {
+  font-size: 1.5em;
+  font-weight: 700;
+}
+
+.rich-editor-surface .rtf-head-2 {
+  font-size: 1.25em;
+  font-weight: 650;
+}
+
+.rich-editor-surface .rtf-head-3 {
+  font-size: 1.1em;
+  font-weight: 600;
+}
+
+.rich-editor-surface .rtf-list,
+.rich-editor-surface .rtf-ordered,
+.rich-editor-surface .rtf-todo {
+  padding-left: 1.5em;
+}
+
+.rich-editor-surface .rtf-list::before {
+  content: "•";
+  margin-left: -1.1em;
+  padding-right: 0.6em;
+  color: var(--muted);
+}
+
+.rich-editor-surface .rtf-ordered::before {
+  content: "1.";
+  margin-left: -1.4em;
+  padding-right: 0.5em;
+  color: var(--muted);
+}
+
+.rich-editor-surface .rtf-quote {
+  padding-left: 0.9em;
+  border-left: 3px solid var(--column-divider);
+  color: var(--muted);
+}
+
+.rich-editor-surface .rtf-center {
+  text-align: center;
+}
+
+.rich-editor-surface .rtf-todo-box {
+  width: 15px;
+  height: 15px;
+  margin: 0 0.5em 0 -1.5em;
+  padding: 0;
+  vertical-align: baseline;
+  border: 1.5px solid var(--column-divider);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* 待办行用复选框代替列表圆点，避免重复标记。 */
+.rich-editor-surface .rtf-todo::before {
+  content: none;
+}
+
+.rich-editor-surface .rtf-todo-box.is-checked {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.rich-editor-surface .rtf-todo-box.is-checked::after {
+  content: "✓";
+  display: block;
+  margin-top: -3px;
+  color: var(--dialog-bg);
+  font-size: 11px;
+  line-height: 1;
+}
+
+@media (max-width: 640px) {
+  .rich-editor-surface .cm-scroller {
+    padding: 14px 18px 60px calc(var(--editor-gutter-width, 25px) + 14px);
+  }
+}
+
+.editor-rich-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rich-toolbar-button);
+  height: var(--rich-toolbar-button);
+  padding: 0;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--note-list-time);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.editor-rich-toolbar button svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.editor-rich-toolbar-text.is-bold {
+  font-weight: 800;
+}
+
+.editor-rich-toolbar-text.is-italic {
+  font-style: italic;
+}
+
+.editor-rich-toolbar-text.is-underline {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.editor-rich-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.editor-rich-toolbar button:hover {
+  background: color-mix(in srgb, var(--note-list-title) 8%, transparent);
+  color: var(--note-list-title);
+}
+
+.editor-rich-toolbar button.is-active {
+  background: color-mix(in srgb, var(--note-list-title) 12%, transparent);
+  color: var(--note-list-title);
+}
+
+@media (min-width: 1600px) {
+  .editor-rich-toolbar {
+    --rich-toolbar-button: 28px;
+    gap: 7px;
+  }
+}
+
+/* 较窄的桌面窗口再压按钮尺寸；1366px 起保留完整间距，方便继续添工具。 */
+@media (max-width: 1180px) {
+  .editor-rich-toolbar {
+    --rich-toolbar-button: 22px;
+    gap: 2px;
+  }
+
+  .editor-rich-toolbar button svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+/* 手机编辑区底部工具栏：贴着键盘上方独占一行，横向可滚动，不挤压正文。 */
+@media (max-width: 640px) {
+  .editor-panel > .editor-rich-toolbar {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) 40px;
+    gap: 2px;
+    padding: 5px 6px;
+    border-top: 1px solid var(--note-list-divider);
+    background: var(--note-list-surface);
+    overflow: visible;
+  }
+
+  .editor-panel > .editor-rich-toolbar > button {
+    --rich-toolbar-button: 54px;
+    width: auto;
+    height: 54px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-radius: 5px;
+    font-size: 13px;
+  }
+
+  .editor-panel > .editor-rich-toolbar > button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .editor-rich-toolbar.is-compact .editor-rich-toolbar-label {
+    display: block;
+    color: currentColor;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 14px;
+    white-space: nowrap;
+  }
+
+  .editor-panel > .editor-rich-toolbar .editor-rich-heading-menu {
+    top: auto;
+    right: auto;
+    bottom: calc(100% + 6px);
+    left: 6px;
+  }
+
+  .editor-panel > .editor-rich-toolbar .editor-rich-more-menu {
+    bottom: calc(100% + 6px);
+  }
 }
 
 .preview-stage {
@@ -4676,7 +5406,7 @@ body,
 .preview-theme-trigger-swatch[data-preview-theme="default"],
 .preview-theme-swatch[data-preview-theme="default"] {
   border-color: rgba(143, 112, 63, 0.28);
-  background: #e5c486 url("/smartisan-theme-icon.png") center / cover
+  background: #e5c486 url("/theme-thumbs/smartisan-theme-icon.png") center / cover
     no-repeat;
 }
 
@@ -4686,7 +5416,7 @@ body,
   background-color: #151315;
   background-image:
     linear-gradient(rgba(0, 0, 0, 0.52), rgba(0, 0, 0, 0.52)),
-    url("/smartisan-theme-icon.png");
+    url("/theme-thumbs/smartisan-theme-icon.png");
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
@@ -4698,7 +5428,7 @@ body,
   background-color: #111111;
   background-image:
     linear-gradient(rgba(0, 0, 0, 0.52), rgba(0, 0, 0, 0.52)),
-    url("/apple-notes-theme-icon.png");
+    url("/theme-thumbs/apple-notes-theme-icon.png");
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
@@ -4707,14 +5437,14 @@ body,
 .preview-theme-trigger-swatch[data-preview-theme="apple-notes-light"],
 .preview-theme-swatch[data-preview-theme="apple-notes-light"] {
   border-color: #d9d3c7;
-  background: #ffffff url("/apple-notes-theme-icon.png") center / cover
+  background: #ffffff url("/theme-thumbs/apple-notes-theme-icon.png") center / cover
     no-repeat;
 }
 
 .preview-theme-trigger-swatch[data-preview-theme="bear"],
 .preview-theme-swatch[data-preview-theme="bear"] {
   border-color: rgba(139, 0, 8, 0.28);
-  background: #cb1622 url("/bear-theme-icon.png") center / cover no-repeat;
+  background: #cb1622 url("/theme-thumbs/bear-theme-icon.png") center / cover no-repeat;
 }
 
 .preview-theme-trigger-swatch[data-preview-theme="bazhahei"],
@@ -4737,7 +5467,7 @@ body,
 .preview-theme-trigger-swatch[data-preview-theme="telegraph"],
 .preview-theme-swatch[data-preview-theme="telegraph"] {
   border-color: #d7dadd;
-  background: #ffffff url("/telegraph-theme-icon.png") center / cover no-repeat;
+  background: #ffffff url("/theme-thumbs/telegraph-theme-icon.png") center / cover no-repeat;
 }
 
 .preview-theme-trigger-swatch i {
@@ -5058,6 +5788,28 @@ body,
   min-height: 0;
   line-height: 0;
   overflow: hidden;
+}
+
+/* 便签字号档位：只缩放正文，纸张与边框保持原尺寸。 */
+.note-copy {
+  zoom: var(--note-font-scale, 1);
+  width: calc(100% / var(--note-font-scale, 1));
+}
+
+/* 下划线（`++文字++`）：预览、PNG 共用。 */
+.note-copy u.markdown-underline {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+/* 官方便签用一对中括号表示居中一段文字（任意行）：预览、PNG、公众号与归档共用。 */
+.note-copy .markdown-centered-line {
+  text-align: center;
+}
+
+/* 待办行只显示复选框（与编辑面一致），不再叠加列表圆点。 */
+.note-copy li:has(> input[type="checkbox"]) {
+  list-style: none;
 }
 
 .note-copy .markdown-blank-line + p,
@@ -5888,8 +6640,9 @@ body,
     --mobile-safe-area-right: env(safe-area-inset-right, 0px);
     --mobile-safe-area-bottom: env(safe-area-inset-bottom, 0px);
     --mobile-safe-area-left: env(safe-area-inset-left, 0px);
-    --editor-line-height: 42px;
-    --editor-font-size: 16px;
+    /* 手机端行高也要跟着便签字号档位缩放，否则底纹与正文会错位。 */
+    --editor-line-height: calc(42px * var(--note-font-scale, 1));
+    --editor-font-size: calc(16px * var(--note-font-scale, 1));
     --editor-rule-offset-y: 0px;
     --editor-rule-thickness: 0.6667px;
     --editor-paper-base: #fbf7ed;
@@ -5934,21 +6687,14 @@ body,
 
   .app-layout {
     position: fixed;
-    top: 0;
+    top: var(--mobile-visual-viewport-offset-top, 0px);
     right: 0;
     left: 0;
     width: auto;
     max-width: none;
-    height: calc(
-      var(--mobile-visual-viewport-height, 100dvh) +
-        var(--mobile-visual-viewport-offset-top, 0px)
-    );
-    max-height: calc(
-      var(--mobile-visual-viewport-height, 100dvh) +
-        var(--mobile-visual-viewport-offset-top, 0px)
-    );
+    height: var(--mobile-visual-viewport-height, 100dvh);
+    max-height: var(--mobile-visual-viewport-height, 100dvh);
     min-height: 0;
-    padding-top: var(--mobile-visual-viewport-offset-top, 0px);
     padding-right: var(--mobile-safe-area-right);
     padding-bottom: var(--mobile-safe-area-bottom);
     padding-left: var(--mobile-safe-area-left);
@@ -7175,6 +7921,7 @@ body,
   .mobile-workspace-tabs {
     --editor-gutter-width: var(--mobile-editor-gutter-width);
     position: relative;
+    z-index: 12;
     height: 50px;
     padding: 0 10px 0 calc(var(--editor-gutter-width) + 10px);
     align-items: center;
@@ -7270,6 +8017,30 @@ body,
   .mobile-note-stats > span:first-child {
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .mobile-note-star {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+  }
+
+  .mobile-note-star .desktop-note-star-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .mobile-format-mode .mobile-format-menu {
+    top: 34px;
+    right: 0;
+    left: auto;
+    z-index: 30;
+    width: 218px;
+  }
+
+  .mobile-format-mode .mobile-format-menu > button {
+    grid-template-columns: 18px 34px minmax(0, 1fr);
+    column-gap: 9px;
   }
 
   .mobile-view-toggle {
@@ -7474,20 +8245,20 @@ body,
     width: 100%;
     height: 42.6667px;
     min-height: 42.6667px;
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) 32px;
     flex: 0 0 42.6667px;
     align-items: stretch;
-    overflow: hidden;
+    overflow: visible;
     border-top: 1px solid #c8d479;
     background: linear-gradient(to bottom, #e9eed1, #e3e9c6);
   }
 
-  .markdown-quick-input button {
-    width: 20%;
+  .markdown-quick-input > button {
+    width: auto;
     min-width: 0;
     height: 100%;
     padding: 0;
-    flex: 1 1 20%;
     border: 0;
     border-right: 1px solid #cdd892;
     border-radius: 0;
@@ -7505,14 +8276,49 @@ body,
     -webkit-tap-highlight-color: transparent;
   }
 
-  .markdown-quick-input button:last-child {
+  .markdown-quick-input > button:last-of-type {
     border-right: 0;
   }
 
-  .markdown-quick-input button:active {
+  .markdown-quick-input > button:active {
     background: #dce5b8;
     box-shadow: none;
     transform: none;
+  }
+
+  .markdown-quick-input .markdown-quick-more-trigger {
+    color: #82983d;
+    font-size: 18px;
+  }
+
+  .markdown-quick-more-menu {
+    position: absolute;
+    right: 4px;
+    bottom: calc(100% + 6px);
+    z-index: 20;
+    width: 196px;
+    padding: 6px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    border: 1px solid #cfd99b;
+    border-radius: 8px;
+    background: #fbfdf3;
+    box-shadow: 0 8px 20px rgba(80, 92, 42, 0.18);
+  }
+
+  .markdown-quick-input .markdown-quick-more-menu button {
+    width: auto;
+    min-width: 0;
+    height: 36px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 5px;
+    background: #f1f5df;
+    color: #718435;
+    font-size: 12px;
+    line-height: 36px;
+    white-space: nowrap;
   }
 
   .mobile-back-icon,
@@ -7585,7 +8391,7 @@ body,
 }
 
 /*
- * Smartisan Notes desktop web parity layer.
+ * Upstream-inspired desktop web parity layer.
  * Mobile keeps the measurements and image resources defined
  * in the mobile block above. Only the category popover keeps responsive
  * overrides here because its interaction was measured from the phone app.
@@ -8060,6 +8866,159 @@ body,
   border-top: 1px solid var(--panel-border);
 }
 
+.settings-about-hero {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-about-hero img {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  border-radius: 17px;
+  box-shadow: 0 8px 20px rgba(78, 57, 34, 0.16);
+}
+
+.settings-about-hero strong,
+.settings-project-card h4,
+.settings-project-credit h4 {
+  display: block;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.settings-about-hero p,
+.settings-project-credit p,
+.settings-update-note {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 19px;
+}
+
+.settings-update-card {
+  overflow: hidden;
+}
+
+.settings-version-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.settings-version-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e8f0d4;
+  color: #647f24;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.settings-update-summary {
+  padding: 13px 18px 4px;
+  display: grid;
+  gap: 4px;
+}
+
+.settings-update-summary small,
+.settings-update-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.settings-update-status {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.settings-update-status.is-available {
+  color: #6d8c29;
+}
+
+.settings-update-status.is-error {
+  color: #a54e43;
+}
+
+.settings-update-actions {
+  padding: 12px 18px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-update-actions button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 600 12px/22px var(--ui-font);
+  cursor: pointer;
+}
+
+.settings-update-actions button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ink) 30%, var(--panel-border));
+}
+
+.settings-update-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.settings-update-actions .settings-update-install {
+  border-color: #6d8c29;
+  background: #6d8c29;
+  color: #fff;
+}
+
+.settings-project-card,
+.settings-project-credit {
+  padding: 17px 18px 18px;
+}
+
+.settings-project-card h4,
+.settings-project-credit h4 {
+  margin: 0 0 10px;
+}
+
+.settings-project-features {
+  margin: 0;
+  padding-left: 19px;
+  display: grid;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 19px;
+}
+
+.settings-project-credit p + p {
+  margin-top: 9px;
+}
+
+.settings-project-credit a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.settings-project-credit a:hover {
+  text-decoration: underline;
+}
+
+.settings-update-note {
+  margin: 0;
+  padding: 0 18px 16px;
+}
+
 .login-dialog-backdrop {
   position: fixed;
   z-index: 120;
@@ -8282,6 +9241,38 @@ body,
   color: #b1acaa;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.login-dialog-nas {
+  margin: 12px 0 0;
+}
+
+.login-dialog-nas-button {
+  width: 100%;
+  height: 46px;
+  border: 1px solid #d5d0ce;
+  border-radius: 7px;
+  background: #fffdfb;
+  color: #6f625d;
+  font: 600 14.5px/1 var(--ui-font);
+}
+
+.login-dialog-nas-button:hover:not(:disabled) {
+  border-color: #bdb5b1;
+  background: #fff;
+}
+
+.login-dialog-nas-button:disabled {
+  color: #b1acaa;
+  cursor: progress;
+}
+
+.login-dialog-nas-hint {
+  margin: 8px 0 0;
+  color: #b1acaa;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .change-password-backdrop {
@@ -8969,12 +9960,37 @@ body,
     background: #232a1f;
   }
 
+  .app-layout[data-theme="smartisan-dark"] .markdown-quick-more-menu {
+    border-color: #455238;
+    background: #293025;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.42);
+  }
+
+  .app-layout[data-theme="smartisan-dark"] .markdown-quick-input .markdown-quick-more-menu button {
+    background: #303a2a;
+    color: #a9bd86;
+  }
+
   .app-layout[data-theme="smartisan-dark"] .preview-stage {
     background-color: #131113;
     background-image: url("/smartisan/mobile/dark/note_background.webp");
     background-repeat: no-repeat;
     background-position: center;
     background-size: 100% 100%;
+  }
+
+  .app-layout[data-theme="smartisan-dark"] .editor-rich-heading-menu,
+  .app-layout[data-theme="smartisan-dark"] .editor-rich-more-menu {
+    border-color: #3b383b;
+    background: #242224;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.46);
+  }
+
+  .app-layout[data-theme="smartisan-dark"] .editor-rich-heading-menu button:hover,
+  .app-layout[data-theme="smartisan-dark"] .editor-rich-heading-menu button[aria-checked="true"],
+  .app-layout[data-theme="smartisan-dark"] .editor-rich-more-menu button:hover,
+  .app-layout[data-theme="smartisan-dark"] .editor-rich-more-menu button.is-active {
+    background: #343034;
   }
 
   .app-layout[data-theme="smartisan-dark"] .category-sidebar,
@@ -9339,12 +10355,6 @@ body,
     color: #aaa7aa;
   }
 
-  .app-layout[data-theme="smartisan-dark"] .desktop-view-switch-trigger {
-    border-color: #343134;
-    background: #1c1a1c;
-    color: #777477;
-  }
-
   .app-layout[data-theme="smartisan-dark"] .desktop-view-menu {
     border-color: #3b383b;
     background: #1e1c1e;
@@ -9363,6 +10373,10 @@ body,
 
   .app-layout[data-theme="smartisan-dark"] .desktop-view-menu button.is-active {
     color: #dedcde;
+  }
+
+  .app-layout[data-theme="smartisan-dark"] .desktop-view-menu button + button {
+    border-top-color: #302d30;
   }
 
   .app-layout[data-theme="smartisan-dark"] .desktop-view-menu button > span {

@@ -10,7 +10,13 @@ interface ChangePasswordDialogProps {
     currentPassword: string,
     newPassword: string,
   ) => Promise<void>;
+  description?: string;
+  initialSetup?: boolean;
   onClose: () => void;
+  onPasswordSet?: () => void;
+  successTitle?: string;
+  successMessage?: string;
+  title?: string;
 }
 
 interface PasswordInputProps {
@@ -65,7 +71,13 @@ function PasswordInput({
 
 export function ChangePasswordDialog({
   changePassword,
+  description,
+  initialSetup = false,
   onClose,
+  onPasswordSet,
+  successTitle,
+  successMessage,
+  title,
 }: ChangePasswordDialogProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -73,6 +85,8 @@ export function ChangePasswordDialog({
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  // 设置成功后父组件的标记会立刻变化，这里保留打开时的模式，避免成功提示被切换成「修改密码」。
+  const [isInitialSetup] = useState(initialSetup);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -109,6 +123,7 @@ export function ChangePasswordDialog({
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      onPasswordSet?.();
       setIsComplete(true);
     } catch (changeError) {
       setError(
@@ -144,26 +159,43 @@ export function ChangePasswordDialog({
           ×
         </button>
 
-        <h2 id="change-password-title">修改密码</h2>
+        <h2 id="change-password-title">
+          {title ?? (isInitialSetup ? "设置应用密码" : "修改密码")}
+        </h2>
 
         {isComplete ? (
           <div className="change-password-success" role="status">
-            <strong>密码修改成功</strong>
-            <p>新密码已生效，其他设备上的旧登录会话已失效。</p>
+            <strong>
+              {successTitle ??
+                (isInitialSetup ? "应用密码已设置" : "密码修改成功")}
+            </strong>
+            <p>
+              {successMessage ??
+                (isInitialSetup
+                  ? "现在可以用「用户名 + 应用密码」登录，与 NAS 登录共用同一份便签。"
+                  : "新密码已生效，其他设备上的旧登录会话已失效。")}
+            </p>
             <button type="button" onClick={onClose}>
               完成
             </button>
           </div>
         ) : (
           <form className="change-password-form" onSubmit={handleSubmit}>
-            <p>修改后，其他设备需要使用新密码重新登录。</p>
-            <PasswordInput
-              autoComplete="current-password"
-              label="当前密码"
-              name="currentPassword"
-              value={currentPassword}
-              onChange={setCurrentPassword}
-            />
+            <p>
+              {description ??
+                (isInitialSetup
+                  ? "NAS 账号第一次设置应用密码不需要旧密码。"
+                  : "修改后，其他设备需要使用新密码重新登录。")}
+            </p>
+            {isInitialSetup ? null : (
+              <PasswordInput
+                autoComplete="current-password"
+                label="当前密码"
+                name="currentPassword"
+                value={currentPassword}
+                onChange={setCurrentPassword}
+              />
+            )}
             <PasswordInput
               autoComplete="new-password"
               label="新密码"
@@ -190,12 +222,16 @@ export function ChangePasswordDialog({
               className="change-password-submit"
               disabled={
                 isSubmitting ||
-                !currentPassword ||
+                (!isInitialSetup && !currentPassword) ||
                 !newPassword ||
                 !confirmPassword
               }
             >
-              {isSubmitting ? "正在修改..." : "确认修改"}
+              {isSubmitting
+                ? "正在提交..."
+                : isInitialSetup
+                  ? "设置应用密码"
+                  : "确认修改"}
             </button>
           </form>
         )}

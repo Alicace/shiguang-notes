@@ -24,6 +24,9 @@ async (page) => {
   async function save() { const saved = page.waitForResponse((response) => response.url().endsWith("/api/workspace") && response.request().method() === "PUT" && response.status() === 200); await editor().press("Meta+s"); await saved; }
   async function settings() { await page.getByRole("button", { name: "打开设置", exact: true }).click(); await page.getByRole("button", { name: "飞牛与诊断", exact: true }).click(); }
   async function report(filename) {
+    // 诊断面板现在只在自己的分类里：需要时切回「飞牛与诊断」，已在当前分类则不动，
+    // 避免多记一条设置分类动作影响「清空后仍为空」的断言。
+    if (await page.locator("#settings-pane-fnos").isHidden()) await page.getByRole("button", { name: "飞牛与诊断", exact: true }).click();
     const wait = page.waitForEvent("download"); await page.getByRole("button", { name: "导出诊断报告 JSON" }).click(); const download = await wait;
     await download.saveAs(`${directory}/${filename}.json`);
     const stream = await download.createReadStream(); let text = ""; for await (const chunk of stream) text += chunk.toString();
@@ -45,7 +48,11 @@ async (page) => {
     return pixels;
   }
 
-  await page.goto("http://127.0.0.1:18338/app/fnnotes-m0/"); await editor().waitFor();
+  // 新浏览器上下文没有登录标记，首开会停在登录页：先走一次 NAS 授权。
+  await page.goto("http://127.0.0.1:18338/app/fnnotes-m0/");
+  await page.locator(".login-dialog-nas-button, .editor-panel textarea").first().waitFor({ timeout: 20000 });
+  if (await page.locator(".login-dialog-nas-button").count()) { await page.locator(".login-dialog-nas-button").click(); await page.locator(".confirm-dialog-actions .primary").click(); }
+  await editor().waitFor();
   if (await page.title() !== "拾光便签") throw new Error("应用名称错误。");
   const automatic = page.waitForResponse((response) => response.url().endsWith("/api/workspace") && response.request().method() === "PUT" && response.status() === 200);
   await editor().fill(sample); await automatic; await save(); await page.reload(); await editor().waitFor();
@@ -72,19 +79,22 @@ async (page) => {
   await settings();
   const capture = page.getByRole("checkbox", { name: "开启当前页面行为记录" });
   if (await capture.isChecked() || (await report("full-diagnostics-off")).events.length) throw new Error("诊断不是默认关闭。");
-  await capture.check(); await page.getByText("F03 ·", { exact: false }).click(); await page.getByRole("combobox", { name: "F03 测试结果" }).selectOption("passed");
+  await capture.check();
+  await page.getByRole("button", { name: "文件授权", exact: true }).click();
+  await page.waitForTimeout(500);
   await page.getByRole("button", { name: "刷新授权状态" }).click();
-  await page.getByRole("status").filter({ hasText: "系统文件授权接口暂不可用" }).waitFor();
+  // 没有系统 API 凭据时走「未就绪」分支；若已有持久化目录，也要按真实数量给出反馈。
+  await page.getByRole("status").filter({ hasText: /当前已授权 \d+ 个目录|当前没有可用的授权目录/ }).waitFor();
   const reportOn = await report("full-diagnostics-enabled");
-  if (!reportOn.tests.some((item) => item.caseId === "F03" && item.result === "passed") || !reportOn.events.some((event) => event.type === "api" && event.data.status === 503)) throw new Error("诊断缺少标记或接口失败信息。");
+  if (!reportOn.events.some((event) => event.type === "api" && event.data.route === "authorized-folders")) throw new Error("诊断缺少目录授权接口记录。");
   await page.getByRole("button", { name: "清空行为记录" }).click();
   if ((await report("full-diagnostics-cleared")).events.some((event) => event.data.action !== "report.export")) throw new Error("清空记录失败。");
   await capture.uncheck(); if ((await report("full-diagnostics-disabled")).events.length) throw new Error("关闭后仍记录。");
   await page.getByRole("dialog", { name: "设置", exact: true }).getByRole("button", { name: "关闭设置", exact: true }).click();
-  results.push({ ids: ["E04", "F28"], result: "完整设置的诊断默认关闭、启用、接口失败、手动标记、JSON 下载、敏感信息排除、清空与关闭通过" });
+  results.push({ ids: ["E04", "F28"], result: "完整设置的诊断默认关闭、启用、接口失败、JSON 下载、敏感信息排除、清空与关闭通过" });
 
   await shareMode();
-  const themes = ["暖白质感", "深夜便签", "iPhone 浅色", "iPhone 深色", "Bear 便签", "老罗巴扎嘿", "Telegra.ph"];
+  const themes = ["暖白质感", "深夜便签", "iPhone 浅色", "iPhone 深色", "Bear 便签", "暖色杂志", "Telegra.ph"];
   const exports = [];
   for (let i=0;i<themes.length;i++) {
     await page.getByRole("button", { name: /^切换预览主题/ }).click();

@@ -2,7 +2,6 @@
 .native-png-stage .note-sheet { width: 720px; box-shadow: none; }
 .native-settings { min-width: 0; font: 0.82rem/1.55 var(--ui-font); color: var(--ink); }
 .native-settings .settings-group { min-width: 0; margin-top: 24px; }
-.native-settings .settings-pane-header { margin-bottom: 20px; }
 .native-identity-card { min-height: 76px; padding: 14px 16px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
 .native-identity-card .settings-account-avatar { width: 36px; height: 36px; font-size: 0.9rem; }
 .native-identity-card .settings-account-copy strong { font-size: 0.86rem; }
@@ -26,17 +25,55 @@
 .native-input-action { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .native-fields-grid { min-width: 0; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(100px, 1fr); gap: 12px; }
 .native-config-grid { display: grid; gap: 14px; }
+.native-service-section { display: grid; gap: 9px; padding: 16px 0; border-top: 1px solid var(--note-list-divider); }
+.native-service-section > strong { color: var(--ink); font-size: 0.9rem; }
+.native-service-section .native-help { margin: 0; }
 .native-space-list, .native-checklist { margin-top: 12px; }
 .native-settings details + details { border-top: 1px solid var(--panel-border); }
 .native-settings summary { min-height: 46px; padding: 12px 16px; cursor: pointer; color: var(--ink); font-weight: 600; font-size: 0.78rem; line-height: 1.5; }
 .native-space-content { display: grid; gap: 14px; padding: 0 16px 16px; }
 .native-space-content .native-help { margin: 0; }
+/* 共享空间成员：直接点已有账号，比手填 NAS UID 更符合日常使用。 */
+.native-member-candidates { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.native-candidate { display: grid; gap: 3px; padding: 9px 11px; text-align: left; }
+.native-candidate strong { font-size: 0.78rem; font-weight: 600; }
+.native-candidate small { color: var(--muted); font-size: 0.68rem; line-height: 1.4; }
+.native-candidate.is-selected { border-color: var(--toolbar-hover-border); background: var(--selector-active); }
+.native-candidate.is-member { opacity: 0.72; }
+.native-invite-uid { margin-top: 2px; }
+.native-invite-uid summary { min-height: 0; padding: 6px 0; color: var(--muted); font-size: 0.72rem; font-weight: 400; }
+.native-invite-uid[open] summary { margin-bottom: 6px; }
+
 .native-member-row, .native-folder-row { min-width: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--panel-border); }
 .native-member-row > span { display: grid; gap: 3px; }
 .native-member-row strong { font-size: 0.78rem; font-weight: 600; }
 .native-member-row small { color: var(--muted); font-size: 0.7rem; }
+
+/* 用户管理：账号列表 + 一次性凭据提示。 */
+.native-user-list { padding: 6px 16px; display: grid; gap: 0; }
+.native-user-row { min-width: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 0; }
+.native-user-row + .native-user-row { border-top: 1px solid var(--panel-border); }
+.native-user-copy { display: grid; gap: 3px; min-width: 0; }
+.native-user-copy strong { font-size: 0.82rem; font-weight: 600; overflow-wrap: anywhere; }
+.native-user-copy small { color: var(--muted); font-size: 0.7rem; }
+.native-user-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.native-user-actions button { min-height: 32px; padding: 6px 10px; font-size: 0.72rem; }
+.native-credential { margin: 12px 0 0; padding: 12px 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; border: 1px solid var(--toolbar-hover-border); border-radius: 8px; background: var(--selector-active); font-size: 0.75rem; line-height: 1.6; }
+.native-credential code { padding: 2px 6px; border-radius: 5px; background: var(--input-bg); font-size: 0.8rem; user-select: all; }
+.native-warning { margin: 0; padding: 10px 12px; border: 1px solid #d9b48a; border-radius: 8px; background: rgba(217, 180, 138, 0.14); color: var(--ink); font-size: 0.73rem; line-height: 1.6; }
+.native-warning code { padding: 1px 5px; border-radius: 4px; background: var(--input-bg); font-size: 0.72rem; }
+
+@media (max-width: 640px) {
+  .native-user-row { flex-direction: column; align-items: stretch; }
+  .native-user-actions { justify-content: flex-start; }
+}
 .native-folder-row code { min-width: 0; overflow-wrap: anywhere; font-size: 0.72rem; }
 .native-diagnostics-card { padding: 16px; }
+/* 运行状态：与设置里其它卡片的标签/取值排版一致。 */
+.native-status-list { margin: 0; display: grid; gap: 10px; }
+.native-status-list > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: baseline; gap: 12px; }
+.native-status-list dt { color: var(--muted); font-size: 0.73rem; }
+.native-status-list dd { margin: 0; color: var(--ink); font-size: 0.78rem; line-height: 1.55; overflow-wrap: anywhere; }
 .native-toggle-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: start; gap: 10px; cursor: pointer; }
 .native-toggle-row input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; margin: 2px 0 0; accent-color: var(--ink); cursor: pointer; }
 .native-toggle-row > span:not(.native-chip) { display: grid; gap: 4px; }
@@ -60,7 +97,18 @@
 .native-account-copy .auth-trigger-label { font-size: 12px; font-weight: 500; }
 .native-account-status { display: flex; gap: 6px; align-items: center; font-size: 10px; color: var(--muted); }
 .native-account-status .auth-trigger-dot { width: 6px; height: 6px; flex-basis: 6px; }
-.native-scope-label { position: fixed; bottom: 18px; right: 120px; z-index: 8; padding: 5px 9px; border: 1px solid var(--panel-border); border-radius: 7px; background: var(--toolbar-surface); color: var(--muted); font: 0.68rem/1.4 var(--ui-font); }
+.native-account-status.is-failed { color: #b34f42; }
+.native-account-status.is-failed .auth-trigger-dot { background: #c35b4c; box-shadow: 0 0 0 2px rgba(195, 91, 76, 0.14); }
+.native-scope-chip { margin-left: 10px; padding: 3px 8px; flex: 0 0 auto; border: 1px solid rgba(255, 255, 255, 0.24); border-radius: 6px; background: rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.88); font: 0.7rem/1.35 var(--ui-font); white-space: nowrap; }
+.topbar-theme-control { position: relative; inset: auto; display: none; }
+.topbar-theme-control .preview-theme-trigger { min-width: 0; height: 38px; padding: 0 12px 0 8px; gap: 7px; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 8px; background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.94); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); font-size: 13px; font-weight: 500; backdrop-filter: none; }
+.topbar-theme-control .preview-theme-trigger:hover,
+.topbar-theme-control .preview-theme-trigger:focus-visible,
+.topbar-theme-control .preview-theme-trigger[aria-expanded="true"] { border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.16); box-shadow: none; }
+.topbar-theme-control .preview-theme-trigger:active { transform: none; }
+.topbar-theme-control .preview-theme-trigger-swatch { width: 22px; height: 22px; }
+.topbar-theme-control .preview-theme-popover { top: calc(100% + 10px); bottom: auto; transform-origin: right top; }
+@media (min-width: 641px) { .topbar-theme-control { display: block; } }
 .app-layout[data-fnos-native="true"] .note-list-pin { display: grid; }
 @media (min-width: 641px) { .app-layout[data-fnos-native="true"] .note-list-select { padding-right: 70px; } }
-@media (max-width: 640px) { .native-input-action { grid-template-columns: 1fr; } .native-fields-grid { grid-template-columns: 1fr; } .native-settings button, .native-settings input:not([type="checkbox"]), .native-settings select { min-height: 44px; } .native-toggle-row { grid-template-columns: 18px minmax(0, 1fr); } .native-toggle-row .native-chip { grid-column: 2; justify-self: start; } .native-scope-label { bottom: 70px; right: 12px; } }
+@media (max-width: 640px) { .native-input-action { grid-template-columns: 1fr; } .native-fields-grid { grid-template-columns: 1fr; } .native-settings button, .native-settings input:not([type="checkbox"]), .native-settings select { min-height: 44px; } .native-toggle-row { grid-template-columns: 18px minmax(0, 1fr); } .native-toggle-row .native-chip { grid-column: 2; justify-self: start; } }

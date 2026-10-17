@@ -9,7 +9,7 @@ const defaultBaseUrl = "http://127.0.0.1:15173";
 const defaultBenchmarkUrl = `${defaultBaseUrl}/?testData=smartisan-web-20&resetTestData=1`;
 
 function printHelp() {
-  console.log(`锤子便签正文输入延迟 benchmark
+  console.log(`拾光便签正文输入延迟 benchmark
 
 用法：
   npm run benchmark:input
@@ -388,7 +388,7 @@ function printHumanResult(result) {
   const input = result.metrics.keydownToInputEventMs;
   const mode = result.viewport.width <= 640 ? "移动端" : "桌面端";
 
-  console.log("锤子便签正文输入延迟 benchmark");
+  console.log("拾光便签正文输入延迟 benchmark");
   console.log(`页面：${result.url}`);
   console.log(`环境：${result.browser}，${mode} ${result.viewport.width} × ${result.viewport.height}`);
   console.log(

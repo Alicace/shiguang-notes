@@ -1,13 +1,15 @@
 ---
 name: notes-export-api
-description: 通过 Token 或首次使用的用户名与密码连接调用方明确配置的锤子便签服务，管理当前账号的云端工作区并导出内容。支持便签列表与全文查询、新增、更新 Markdown、软删除、回收站恢复、显式永久删除、文件夹分类、星标、置顶、生成可粘贴到微信公众号的富文本 HTML，以及把 Markdown 或本地 .md 文件导出为带图的锤子便签长图 PNG；导出支持 default 暖白纸感、smartisan-dark 暗黑主题和自定义底部文案。用户提到锤子便签、用 AI 增删改查便签、便签查询或自动维护、分类、收藏、置顶、公众号复制格式、Markdown 转便签图片或批量长图导出时使用。服务地址没有默认值，调用方必须通过 .env 或命令行明确提供。
+description: 通过 Token 或首次使用的用户名与密码连接调用方明确配置的拾光便签服务，管理当前账号的云端工作区并导出内容。支持便签列表与全文查询、新增、更新 Markdown、软删除、回收站恢复、显式永久删除、文件夹分类、星标、置顶、生成可粘贴到微信公众号的富文本 HTML，以及把 Markdown 或本地 .md 文件导出为带图的拾光便签长图 PNG；导出支持 default 暖白纸感、dark 暗黑主题和自定义底部文案。用户提到拾光便签、用 AI 增删改查便签、便签查询或自动维护、分类、收藏、置顶、公众号复制格式、Markdown 转便签图片或批量长图导出时使用。服务地址没有默认值，调用方必须通过 .env 或命令行明确提供。
 ---
 
-# 锤子便签 API
+# 拾光便签 API
 
 直接调用项目 API，不在本地重写工作区、公众号排版或长图渲染逻辑。
 
-开源地址：`https://github.com/zhaoolee/notes`
+开源地址：`https://github.com/Alicace/shiguang-notes`
+
+上游项目：`https://github.com/zhaoolee/notes`（Apache-2.0，保留原始归属）。
 
 ## 配置服务
 
@@ -61,7 +63,7 @@ scripts/export_note.sh \
 
 - 查询、新增、分类、星标、置顶或生成公众号格式：使用
   `scripts/notes_api.mjs`。
-- 把 Markdown 导出为锤子便签长图 PNG：使用 `scripts/export_note.sh`。
+- 把 Markdown 导出为拾光便签长图 PNG：使用 `scripts/export_note.sh`。
 
 ## 管理云端便签
 
@@ -140,7 +142,7 @@ Hermes 使用本 Skill 时，终端后端必须能看到 Skill 脚本和配置�
 3. 传入绝对输出路径 `--output`。
 4. 使用 `--markdown-file` 时，让脚本自动扫描并上传相对路径、绝对路径或
    `file://` 本地图片，再回填同源 `/api/images/import` 返回的 URL。
-5. 只有调用方明确要求暗色时才传 `--theme smartisan-dark`；否则使用默认
+5. 只有调用方明确要求暗色时才传 `--theme dark`；否则使用默认
    `default` 暖白纸感，不要为主题额外追问。
 6. 只有调用方要求自定义署名时才传 `--footer-brand` 或 `--footer-via`。
 
@@ -151,7 +153,7 @@ scripts/export_note.sh \
 
 scripts/export_note.sh \
   --markdown '## **0x01**\n正文内容' \
-  --theme smartisan-dark \
+  --theme dark \
   --footer-brand '由方圆小站发送' \
   --footer-via 'via Notes API' \
   --output /abs/path/note-dark.png

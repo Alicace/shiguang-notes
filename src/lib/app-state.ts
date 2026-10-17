@@ -19,6 +19,9 @@ import {
   FOOTER_VIA_STORAGE_KEY,
   LEGACY_DEFAULT_FOOTER_BRAND,
   LEGACY_DEFAULT_FOOTER_VIA,
+  LEGACY_FOOTER_LOGO_URLS,
+  LEGACY_UPSTREAM_FOOTER_BRAND,
+  LEGACY_UPSTREAM_FOOTER_VIA,
 } from "./footer";
 
 export {
@@ -153,9 +156,12 @@ export function getInitialFooterBrand(): string {
   }
 
   const storedBrand = readStoredValue(FOOTER_BRAND_STORAGE_KEY);
-  return (storedBrand === LEGACY_DEFAULT_FOOTER_BRAND
-    ? DEFAULT_FOOTER_BRAND
-    : storedBrand ?? DEFAULT_FOOTER_BRAND
+  // 两个旧默认署名（含上游品牌名）都迁移到自己的默认署名。
+  return (
+    storedBrand === LEGACY_DEFAULT_FOOTER_BRAND ||
+    storedBrand === LEGACY_UPSTREAM_FOOTER_BRAND
+      ? DEFAULT_FOOTER_BRAND
+      : (storedBrand ?? DEFAULT_FOOTER_BRAND)
   ).slice(0, FOOTER_TEXT_MAX_LENGTH);
 }
 
@@ -166,17 +172,25 @@ export function getInitialFooterVia(): string {
   }
 
   const storedVia = readStoredValue(FOOTER_VIA_STORAGE_KEY);
-  return (storedVia === LEGACY_DEFAULT_FOOTER_VIA
-    ? DEFAULT_FOOTER_VIA
-    : storedVia ?? DEFAULT_FOOTER_VIA
+  return (
+    storedVia === LEGACY_DEFAULT_FOOTER_VIA ||
+    storedVia === LEGACY_UPSTREAM_FOOTER_VIA
+      ? DEFAULT_FOOTER_VIA
+      : (storedVia ?? DEFAULT_FOOTER_VIA)
   ).slice(0, FOOTER_TEXT_MAX_LENGTH);
 }
 
 export function getInitialFooterLogoUrl(): string {
-  return (
+  const value =
     readSearchParam("footerLogoUrl") ??
     readStoredValue(FOOTER_LOGO_STORAGE_KEY) ??
-    DEFAULT_FOOTER_LOGO_URL
+    DEFAULT_FOOTER_LOGO_URL;
+  const normalized = value.replace(/^\/app\/fnnotes-m0/, "");
+
+  return (
+    LEGACY_FOOTER_LOGO_URLS.includes(normalized)
+      ? DEFAULT_FOOTER_LOGO_URL
+      : value
   ).slice(0, FOOTER_LOGO_URL_MAX_LENGTH);
 }
 

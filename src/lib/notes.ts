@@ -1,9 +1,16 @@
 import type {
+  FormattingMode,
   NoteCategoryId,
   NoteDocument,
   NoteFolder,
   NoteWorkspace,
 } from "../types/app.js";
+import { normalizeNoteFontScale } from "./note-typography.js";
+import {
+  normalizeFormattingMode,
+  parseRichTextContent,
+  richTextToMarkdown,
+} from "./rich-text.js";
 
 const NOTE_TITLE_MAX_LENGTH = 38;
 const NOTE_PREVIEW_MAX_LENGTH = 88;
@@ -89,6 +96,30 @@ function isValidNote(value: unknown): value is NoteDocument {
   );
 }
 
+// 富文本便签的 markdown 是派生视图：读回时按文本与样式重算，保证预览、导出与 Skill 拿到同一份内容。
+export function normalizeRichNote(note: NoteDocument): NoteDocument {
+  const formattingMode = normalizeFormattingMode(note.formattingMode);
+  const fontScale = normalizeNoteFontScale(note.fontScale);
+
+  if (formattingMode !== "rich") {
+    return { ...note, fontScale, formattingMode, richText: note.richText ?? null };
+  }
+
+  const richText = parseRichTextContent(note.richText);
+
+  if (!richText) {
+    return { ...note, fontScale, formattingMode, richText: null };
+  }
+
+  return {
+    ...note,
+    fontScale,
+    formattingMode,
+    markdown: richTextToMarkdown(richText),
+    richText,
+  };
+}
+
 function isValidFolder(value: unknown): value is NoteFolder {
   if (!value || typeof value !== "object") {
     return false;
@@ -111,10 +142,13 @@ export function createNoteDocument(
   normalOrder = 0,
   folderId: string | null = null,
   isStarred = false,
+  formattingMode: FormattingMode = "markdown",
 ): NoteDocument {
   return {
     id: createNoteId(now),
     markdown,
+    formattingMode,
+    richText: null,
     createdAt: now,
     updatedAt: now,
     normalOrder,
@@ -452,7 +486,7 @@ export function parseNoteWorkspace(value: string | null): NoteWorkspace | null {
     );
     const validFolderIds = new Set(normalizedFolders.map((folder) => folder.id));
     const normalizedNotes = parsed.notes.map((note, index) => ({
-      ...note,
+      ...normalizeRichNote(note),
       normalOrder:
         typeof note.normalOrder === "number" && Number.isFinite(note.normalOrder)
           ? note.normalOrder

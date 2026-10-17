@@ -18,18 +18,28 @@ import {
 } from "../lib/notes";
 import type {
   CopyState,
+  FormattingMode,
   NoteDocument,
   NoteFolder,
   NoteWorkspace,
   PendingAction,
+  RichTextContent,
   ThemePreferenceId,
 } from "../types/app";
+import { normalizeNoteFontScale } from "../lib/note-typography.js";
+import {
+  markdownToRichText,
+  parseRichTextContent,
+  reconcileRichTextAfterEdit,
+  richTextToMarkdown,
+} from "../lib/rich-text.js";
 
 interface AppStoreState {
   activeNoteId: string;
   folders: NoteFolder[];
   notes: NoteDocument[];
   markdown: string;
+  richText: RichTextContent | null;
   selectedTheme: ThemePreferenceId;
   isExporting: boolean;
   exportError: string;
@@ -54,6 +64,10 @@ interface AppStoreState {
   reorderNotes: (activeNoteId: string, overNoteId: string) => void;
   moveNoteToFolder: (noteId: string, folderId: string | null) => void;
   setMarkdown: (markdown: string) => void;
+  setFormattingMode: (mode: FormattingMode) => void;
+  setNoteFontScale: (scale: number) => void;
+  setRichText: (text: string) => void;
+  setRichStyles: (rich: RichTextContent) => void;
   setSelectedTheme: (theme: ThemePreferenceId) => void;
   setIsExporting: (isExporting: boolean) => void;
   setExportError: (exportError: string) => void;
@@ -74,11 +88,17 @@ const initialActiveNote =
   initialWorkspace.notes.find((note) => note.id === initialWorkspace.activeNoteId) ??
   initialWorkspace.notes[0];
 
+// 便签的内容以 Markdown 为渲染视图，富文本便签额外保存文本与样式数据。
+function activeContent(note: NoteDocument) {
+  return { markdown: note.markdown, richText: note.richText ?? null };
+}
+
 export const useAppStore = create<AppStoreState>((set, get) => ({
   activeNoteId: initialActiveNote.id,
   folders: initialWorkspace.folders,
   notes: initialWorkspace.notes,
   markdown: initialActiveNote.markdown,
+  richText: initialActiveNote.richText ?? null,
   selectedTheme: getInitialTheme(),
   isExporting: false,
   exportError: "",
@@ -106,7 +126,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       return {
         activeNoteId: note.id,
         exportError: "",
-        markdown: note.markdown,
+        ...activeContent(note),
         notes: [note, ...state.notes],
         pendingAction: null,
       };
@@ -135,7 +155,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       return {
         activeNoteId: discarded.activeNote.id,
         exportError: "",
-        markdown: discarded.activeNote.markdown,
+        ...activeContent(discarded.activeNote),
         notes: discarded.notes,
         pendingAction: null,
       };
@@ -186,7 +206,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set({
       activeNoteId: note.id,
       exportError: "",
-      markdown: note.markdown,
+      ...activeContent(note),
       pendingAction: null,
     });
   },
@@ -242,7 +262,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         activeNoteId: activeNote.id,
         exportError: "",
         folders: workspace.folders,
-        markdown: activeNote.markdown,
+        ...activeContent(activeNote),
         notes: workspace.notes,
         pendingAction: null,
       };
@@ -272,6 +292,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }),
   setMarkdown: (markdown) =>
     editable() && set((state) => {
+      const activeNote = state.notes.find((note) => note.id === state.activeNoteId);
       const updatedAt = Date.now();
       return {
         markdown,
@@ -280,8 +301,111 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
             ? {
                 ...note,
                 markdown,
+                // 顶层文本改动会让原有样式区间失效，这里直接丢弃，避免导出错位。
+                richText:
+                  activeNote?.formattingMode === "rich" ? null : note.richText ?? null,
                 updatedAt,
               }
+            : note,
+        ),
+        richText: activeNote?.formattingMode === "rich" ? null : state.richText,
+      };
+    }),
+  // 切换排版模式：Markdown 与富文本互转。样式数据在双向都在且一致时保留，
+  // 只有 Markdown 侧被改过才重新解析，切模式既不会丢格式也不会丢修改。
+  setFormattingMode: (mode) =>
+    editable() && set((state) => {
+      const activeNote = state.notes.find((note) => note.id === state.activeNoteId);
+
+      if (!activeNote) {
+        return {};
+      }
+
+      const currentMode = activeNote.formattingMode ?? "markdown";
+
+      if (currentMode === mode) {
+        return {};
+      }
+
+      let richText: RichTextContent | null = activeNote.richText ?? null;
+      let markdown = activeNote.markdown;
+
+      if (mode === "rich") {
+        richText =
+          richText && richTextToMarkdown(richText) === markdown
+            ? richText
+            : markdownToRichText(markdown);
+        markdown = richTextToMarkdown(richText);
+      } else if (currentMode === "rich" && richText) {
+        markdown = richTextToMarkdown(richText);
+      }
+
+      const updatedAt = Date.now();
+      return {
+        markdown,
+        richText,
+        notes: state.notes.map((note) =>
+          note.id === activeNote.id
+            ? { ...note, formattingMode: mode, markdown, richText, updatedAt }
+            : note,
+        ),
+      };
+    }),
+  // 便签字号档位（官方移动端 A+/A- 的等价物）：只影响整篇排版，不改正文。
+  setNoteFontScale: (scale) =>
+    editable() && set((state) => {
+      const fontScale = normalizeNoteFontScale(scale);
+      return {
+        notes: state.notes.map((note) =>
+          note.id === state.activeNoteId
+            ? { ...note, fontScale, updatedAt: Date.now() }
+            : note,
+        ),
+      };
+    }),
+  setRichText: (text) =>
+    editable() && set((state) => {
+      const activeNote = state.notes.find((note) => note.id === state.activeNoteId);
+
+      if (!activeNote) {
+        return {};
+      }
+
+      const base: RichTextContent = activeNote.richText ?? {
+        inline: [],
+        lineStyles: {},
+        text: "",
+      };
+      const richText = reconcileRichTextAfterEdit(base, text);
+      const markdown = richTextToMarkdown(richText);
+      const updatedAt = Date.now();
+      return {
+        markdown,
+        richText,
+        notes: state.notes.map((note) =>
+          note.id === activeNote.id
+            ? { ...note, markdown, richText, updatedAt }
+            : note,
+        ),
+      };
+    }),
+  setRichStyles: (rich) =>
+    editable() && set((state) => {
+      const activeNote = state.notes.find((note) => note.id === state.activeNoteId);
+      const richText = parseRichTextContent(rich);
+
+      if (!activeNote || !richText) {
+        return {};
+      }
+
+      const markdown = richTextToMarkdown(richText);
+      const updatedAt = Date.now();
+      return {
+        markdown,
+        richText,
+        notes: state.notes.map((note) =>
+          note.id === activeNote.id
+            ? { ...note, markdown, richText, updatedAt }
             : note,
         ),
       };
@@ -320,16 +444,30 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
     if (pendingAction.kind === "replace-markdown") {
       const updatedAt = Date.now();
+      const replacedRich = notes.some(
+        (note) =>
+          note.id === pendingAction.noteId && note.formattingMode === "rich",
+      )
+        ? markdownToRichText(pendingAction.nextMarkdown)
+        : null;
       set({
         markdown:
           pendingAction.noteId === activeNoteId
             ? pendingAction.nextMarkdown
             : get().markdown,
+        richText:
+          pendingAction.noteId === activeNoteId
+            ? replacedRich ?? get().richText
+            : get().richText,
         notes: notes.map((note) =>
           note.id === pendingAction.noteId
             ? {
                 ...note,
                 markdown: pendingAction.nextMarkdown,
+                richText:
+                  note.formattingMode === "rich"
+                    ? (replacedRich ?? note.richText ?? null)
+                    : (note.richText ?? null),
                 updatedAt,
               }
             : note,
@@ -353,12 +491,14 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       const liveNotes = deletedNotes.filter((note) => note.deletedAt === null);
 
       if (liveNotes.length === 0) {
-        const emptyNote = createNoteDocument();
         set({
-          activeNoteId: emptyNote.id,
+          // 删除最后一张正常便签后留在空工作区，由用户主动点击新建；
+          // 已删除内容仍保留在回收站，不能偷偷塞回一张空白便签。
+          activeNoteId: pendingAction.noteId,
           exportError: "",
-          markdown: emptyNote.markdown,
-          notes: [emptyNote, ...deletedNotes],
+          markdown: "",
+          richText: null,
+          notes: deletedNotes,
           pendingAction: null,
         });
         return;
@@ -368,7 +508,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       set({
         activeNoteId: nextActiveNote.id,
         exportError: "",
-        markdown: nextActiveNote.markdown,
+        ...activeContent(nextActiveNote),
         notes: deletedNotes,
         pendingAction: null,
       });
@@ -383,7 +523,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       set({
         activeNoteId: emptyNote.id,
         exportError: "",
-        markdown: emptyNote.markdown,
+        ...activeContent(emptyNote),
         notes: [emptyNote],
         pendingAction: null,
       });
@@ -404,7 +544,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set({
       activeNoteId: nextActiveNote.id,
       exportError: "",
-      markdown: nextActiveNote.markdown,
+      ...activeContent(nextActiveNote),
       notes: remainingNotes,
       pendingAction: null,
     });

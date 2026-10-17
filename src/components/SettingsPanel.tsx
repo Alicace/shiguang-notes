@@ -9,6 +9,13 @@ import { importImageFile } from "../lib/images.js";
 import { HERMES_SKILL_INSTALL_INSTRUCTION_PREVIEW } from "../lib/hermes.js";
 import { THEME_OPTIONS } from "../lib/themes.js";
 import {
+  fetchLatestAppUpdate,
+  isNewerVersion,
+  PROJECT_REPOSITORY_URL,
+  UPSTREAM_REPOSITORY_URL,
+  type AppUpdate,
+} from "../lib/app-update.js";
+import {
   getWechatConnectionStatus,
   getWechatConfiguration,
   saveWechatConfiguration,
@@ -17,11 +24,19 @@ import type { WorkspaceArchiveProgress } from "../lib/export.js";
 import type { ThemePreferenceId } from "../types/app.js";
 import { isNative, appPath } from "../lib/fnos-client.js";
 import { NativeSettings } from "../native/NativeSettings.js";
+import { NativeServiceConfig } from "../native/NativeServiceConfig.js";
+import { SpacesPanel } from "../native/SpacesPanel.js";
+import { FileAccessPanel } from "../native/FileAccessPanel.js";
+import { UserManagement } from "../native/UserManagement.js";
+import { nativeJson, nativeWrite, useNativeSession } from "../native/api.js";
 
 interface SettingsPanelProps {
   onNativeSpaceChange?: (scope: string) => Promise<void>;
   aiAvailable?: boolean;
   aiEnabled?: boolean;
+  appPasswordConfigured?: boolean;
+  appVersion?: string;
+  upstreamVersion?: string;
   authUsername?: string | null;
   canConfigureWechat?: boolean;
   canChangePassword?: boolean;
@@ -59,20 +74,40 @@ const SETTINGS_CATEGORIES = [
   { id: "general", label: "常规" },
   { id: "personalization", label: "个性化" },
   { id: "account", label: "账号与同步" },
+  { id: "spaces", label: "共享空间", nativeOnly: true },
+  { id: "files", label: "文件授权", nativeOnly: true },
   { id: "extensions", label: "工具与扩展" },
   { id: "about", label: "关于" },
-  { id: "fnos", label: "飞牛与诊断" },
+  { id: "fnos", label: "飞牛与诊断", nativeOnly: true },
 ] as const;
 
 type SettingsCategory = (typeof SETTINGS_CATEGORIES)[number]["id"];
 
-const PROJECT_REPOSITORY_URL = "https://github.com/zhaoolee/notes";
 const CHANGELOG_URL = appPath("/changelog");
+
+type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "current"
+  | "downloading"
+  | "ready"
+  | "error";
+
+interface NativeUpdateResponse {
+  currentVersion: string;
+  hasUpdate: boolean;
+  installable: boolean;
+  latest: AppUpdate;
+}
 
 export function SettingsPanel({
   onNativeSpaceChange = async () => {},
   aiAvailable = false,
   aiEnabled = false,
+  appVersion = "",
+  upstreamVersion = "",
+  appPasswordConfigured = true,
   authUsername = null,
   canConfigureWechat = false,
   canChangePassword = false,
@@ -100,6 +135,7 @@ export function SettingsPanel({
   onThemeChange,
   onWorkspaceArchiveExport = () => undefined,
 }: SettingsPanelProps) {
+  const nativeSession = useNativeSession();
   const [category, setCategory] = useState<SettingsCategory>("general");
   const [isFooterLogoUploading, setIsFooterLogoUploading] = useState(false);
   const [footerLogoError, setFooterLogoError] = useState("");
@@ -115,7 +151,12 @@ export function SettingsPanel({
   const [wechatConnectionError, setWechatConnectionError] = useState("");
   const [isWechatAppSecretVisible, setIsWechatAppSecretVisible] =
     useState(false);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [latestUpdate, setLatestUpdate] = useState<AppUpdate | null>(null);
+  const [updateMessage, setUpdateMessage] = useState("");
+  const [installerPath, setInstallerPath] = useState("");
   const footerLogoInputRef = useRef<HTMLInputElement | null>(null);
+  const updateCheckStartedRef = useRef(false);
   const isDefaultFooterLogo = footerLogoUrl === DEFAULT_FOOTER_LOGO_URL;
   const isDefaultFooter =
     footerBrand === DEFAULT_FOOTER_BRAND &&
@@ -123,6 +164,80 @@ export function SettingsPanel({
     footerVia === DEFAULT_FOOTER_VIA;
   const accountInitial =
     authUsername?.trim().charAt(0).toLocaleUpperCase("zh-CN") || "便";
+
+  async function checkForUpdates(): Promise<void> {
+    if (!appVersion || ["checking", "downloading"].includes(updateStatus)) return;
+    setUpdateStatus("checking");
+    setUpdateMessage("");
+    setInstallerPath("");
+    try {
+      let next: AppUpdate;
+      let newer: boolean;
+      if (isNative) {
+        const response = await nativeJson<NativeUpdateResponse>("/api/fnos/update");
+        next = response.latest;
+        newer = response.hasUpdate;
+      } else {
+        next = await fetchLatestAppUpdate();
+        newer = isNewerVersion(next.version, appVersion);
+      }
+      setLatestUpdate(next);
+      if (newer) {
+        setUpdateStatus("available");
+        setUpdateMessage(`发现新版本 ${next.version}`);
+      } else {
+        setUpdateStatus("current");
+        setUpdateMessage(`已是最新版本 ${appVersion}`);
+      }
+    } catch (error) {
+      setLatestUpdate(null);
+      setUpdateStatus("error");
+      setUpdateMessage(
+        error instanceof Error ? error.message : "检查更新失败，请稍后重试。",
+      );
+    }
+  }
+
+  async function downloadAndInstallUpdate(): Promise<void> {
+    if (!latestUpdate || ["checking", "downloading"].includes(updateStatus)) return;
+    if (!isNative || !nativeSession?.user.isAdmin || !latestUpdate.asset) {
+      window.open(latestUpdate.releaseUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setUpdateStatus("downloading");
+    setUpdateMessage("正在通过加速线路下载并校验安装包…");
+    try {
+      const result = await nativeJson<{ path: string; reused: boolean }>(
+        "/api/fnos/update/download",
+        nativeWrite({}),
+      );
+      setInstallerPath(result.path);
+      setUpdateStatus("ready");
+      setUpdateMessage("安装包已通过 SHA-256 校验，正在打开飞牛安装器…");
+      const { TrimApp } = await import("@trimjs/web-app");
+      const app = new TrimApp();
+      try {
+        await app.openFile(result.path);
+      } catch {
+        await app.openFileManager(result.path).catch(() => undefined);
+        setUpdateMessage(
+          "安装包已下载并校验。请在飞牛应用中心手动选择该 FPK 完成升级。",
+        );
+      }
+    } catch (error) {
+      setUpdateStatus("error");
+      setUpdateMessage(
+        error instanceof Error ? error.message : "安装包下载失败，请稍后重试。",
+      );
+    }
+  }
+
+  useEffect(() => {
+    if (updateCheckStartedRef.current || !appVersion) return;
+    updateCheckStartedRef.current = true;
+    void checkForUpdates();
+    // appVersion 是本次安装的固定版本号；只在设置面板首次打开时自动检查一次。
+  }, [appVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -281,7 +396,9 @@ export function SettingsPanel({
 
         <div className="settings-layout">
           <nav className="settings-category-nav" aria-label="设置分类">
-            {SETTINGS_CATEGORIES.filter((item) => item.id !== "fnos" || isNative).map((item) => {
+            {SETTINGS_CATEGORIES.filter(
+              (item) => !("nativeOnly" in item) || isNative,
+            ).map((item) => {
               const isActive = category === item.id;
 
               return (
@@ -301,8 +418,33 @@ export function SettingsPanel({
           </nav>
 
           <div className="settings-content">
-            {isNative && category === "extensions" && <p>飞牛网关会先校验 NAS 登录态。外部 Skill/DSH 需配置有效的 NAS 登录态及自己的应用 Token；应用 Token 不能代替 NAS 登录。PNG 由客户端生成，NAS 上不运行截图服务。</p>}
-            {isNative && <section id="settings-pane-fnos" className="settings-pane" hidden={category !== "fnos"}><NativeSettings onSpaceChange={onNativeSpaceChange} /></section>}
+            {isNative && (
+              <section
+                id="settings-pane-spaces"
+                className="settings-pane"
+                hidden={category !== "spaces"}
+              >
+                <SpacesPanel onSpaceChange={onNativeSpaceChange} />
+              </section>
+            )}
+            {isNative && (
+              <section
+                id="settings-pane-files"
+                className="settings-pane"
+                hidden={category !== "files"}
+              >
+                <FileAccessPanel />
+              </section>
+            )}
+            {isNative && (
+              <section
+                id="settings-pane-fnos"
+                className="settings-pane"
+                hidden={category !== "fnos"}
+              >
+                <NativeSettings />
+              </section>
+            )}
             <section
               id="settings-pane-general"
               className="settings-pane"
@@ -517,8 +659,16 @@ export function SettingsPanel({
                         onClick={onChangePassword}
                       >
                         <span className="settings-row-label">
-                          修改密码
-                          <small>更新密码后，其他设备和旧 Skill Token 会失效</small>
+                          {isNative && !appPasswordConfigured
+                            ? "设置应用密码"
+                            : "修改密码"}
+                          <small>
+                            {isNative
+                              ? appPasswordConfigured
+                                ? "更新密码后，其他设备和旧 Skill Token 会失效"
+                                : "NAS 账号第一次设置不需要旧密码，设置后可用账号密码登录"
+                              : "更新密码后，其他设备和旧 Skill Token 会失效"}
+                          </small>
                         </span>
                         <span className="settings-row-value">
                           <span className="settings-row-chevron" aria-hidden="true">›</span>
@@ -530,7 +680,10 @@ export function SettingsPanel({
                       className="settings-row settings-logout-row"
                       onClick={onLogout}
                     >
-                      <span className="settings-row-label">{isNative ? "返回 NAS 管理登录态" : "退出登录"}</span>
+                      <span className="settings-row-label">
+                        退出登录
+                        {isNative ? <small>只退出拾光便签，不会退出飞牛 NAS 系统账号</small> : null}
+                      </span>
                       <span className="settings-row-value">
                         <span className="settings-row-chevron" aria-hidden="true">›</span>
                       </span>
@@ -607,6 +760,9 @@ export function SettingsPanel({
                   ) : null}
                 </div>
               </section>
+
+              {/* 用户管理属于账号范畴：与登录状态、密码放在同一个分类里。 */}
+              {isNative ? <UserManagement /> : null}
             </section>
 
             <section
@@ -619,6 +775,14 @@ export function SettingsPanel({
                 <h3 id="settings-extensions-title">工具与扩展</h3>
                 <p>管理 AI 辅助能力和外部工具扩展。</p>
               </header>
+
+              {isNative ? (
+                <p className="settings-native-note">
+                  飞牛网关会先校验 NAS 登录态。外部 Skill/DSH 需配置有效的 NAS
+                  登录态及自己的应用 Token；应用 Token 不能代替 NAS 登录。PNG
+                  由客户端生成，NAS 上不运行截图服务。
+                </p>
+              ) : null}
 
               {canConfigureWechat ? (
                 <section className="settings-group" aria-label="公众号配置">
@@ -857,6 +1021,7 @@ export function SettingsPanel({
                   </div>
                 </article>
               </section>
+              <NativeServiceConfig />
             </section>
 
             <section
@@ -866,9 +1031,140 @@ export function SettingsPanel({
               hidden={category !== "about"}
             >
               <header className="settings-pane-header">
-                <h3 id="settings-about-title">关于</h3>
-                <p>查看锤子便签 Skill 的开源项目。</p>
+                <h3 id="settings-about-title">关于拾光便签</h3>
+                <p>一款为飞牛 fnOS 打造的私有便签与共享空间应用。</p>
               </header>
+
+              <section className="settings-card settings-about-hero" aria-label="项目介绍">
+                <img
+                  src={appPath("/brand/shiguang-app-icon.png")}
+                  alt="拾光便签"
+                  width="72"
+                  height="72"
+                />
+                <div>
+                  <strong>拾光便签</strong>
+                  <p>
+                    在 NAS 本机保存正文与图片，支持飞牛账号、独立账号、租户隔离、
+                    共享空间、富文本与 Markdown 双向排版、PNG 和公众号导出。
+                  </p>
+                </div>
+              </section>
+
+              {appVersion ? (
+                <section className="settings-card settings-update-card" aria-label="应用版本">
+                  <div className="settings-row">
+                    <span className="settings-row-label">
+                      拾光便签版本
+                      <small>
+                        飞牛原生应用，基于上游 {upstreamVersion || "开源版本"} 二次开发
+                      </small>
+                    </span>
+                    <span className="settings-row-value settings-version-value">
+                      {appVersion}
+                      {updateStatus === "available" && latestUpdate ? (
+                        <span className="settings-version-badge">
+                          {latestUpdate.version}
+                        </span>
+                      ) : null}
+                    </span>
+                  </div>
+                  <div className="settings-update-summary">
+                    <span
+                      className={`settings-update-status is-${updateStatus}`}
+                      role="status"
+                    >
+                      {updateStatus === "checking"
+                        ? "正在检查版本清单…"
+                        : updateStatus === "downloading"
+                          ? "正在下载并校验…"
+                          : updateMessage || "打开设置时自动检查新版本"}
+                    </span>
+                    {latestUpdate?.publishedAt ? (
+                      <small>发布日期：{latestUpdate.publishedAt.slice(0, 10)}</small>
+                    ) : null}
+                  </div>
+                  <div className="settings-update-actions">
+                    <button
+                      type="button"
+                      className="settings-update-check"
+                      disabled={["checking", "downloading"].includes(updateStatus)}
+                      onClick={() => void checkForUpdates()}
+                    >
+                      {updateStatus === "checking" ? "检查中…" : "检查更新"}
+                    </button>
+                    {["available", "ready"].includes(updateStatus) && latestUpdate ? (
+                      <button
+                        type="button"
+                        className="settings-update-install"
+                        disabled={updateStatus === "downloading"}
+                        onClick={() => void downloadAndInstallUpdate()}
+                      >
+                        {updateStatus === "ready"
+                          ? "重新打开安装器"
+                          : isNative && nativeSession?.user.isAdmin
+                            ? `升级到 ${latestUpdate.version}`
+                            : `查看 ${latestUpdate.version} 新版本`}
+                      </button>
+                    ) : null}
+                  </div>
+                  {installerPath ? (
+                    <p className="settings-update-note">
+                      安装包已保存在 NAS 应用数据目录并通过完整性校验。
+                    </p>
+                  ) : null}
+                </section>
+              ) : null}
+
+              <section className="settings-card settings-project-card" aria-label="功能说明">
+                <h4>主要功能</h4>
+                <ul className="settings-project-features">
+                  <li>多便签、分类、搜索、星标、置顶、回收站与自动保存</li>
+                  <li>富文本和 Markdown 双模式，支持标题、引用、待办、图片与四种字号</li>
+                  <li>暖白、深夜、iPhone、Bear、暖色杂志和 Telegra.ph 等配色</li>
+                  <li>飞牛账号自动登录、独立账号、管理员用户管理与租户数据隔离</li>
+                  <li>共享空间、成员编辑/只读权限和目录授权</li>
+                  <li>PNG、公众号富文本、Markdown 资源包和离线 HTML 导出</li>
+                  <li>AI 审阅、Skill/DSH 插件接入和 NAS 本地图片导入</li>
+                </ul>
+              </section>
+
+              <section className="settings-card settings-project-credit" aria-label="来源与许可">
+                <h4>来源与开源许可</h4>
+                <p>
+                  本项目基于
+                  {" "}
+                  <a href={UPSTREAM_REPOSITORY_URL} target="_blank" rel="noopener noreferrer">
+                    zhaoolee/notes
+                  </a>
+                  {" "}
+                  {upstreamVersion ? `${upstreamVersion} ` : ""}
+                  二次开发，感谢原作者与所有贡献者。上游项目采用
+                  {" "}
+                  <a
+                    href={`${PROJECT_REPOSITORY_URL}/blob/main/LICENSE`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Apache License 2.0
+                  </a>
+                  ；
+                  本项目的修改、飞牛原生封装和新功能沿用同一许可，并保留原始版权与
+                  <a
+                    href={`${PROJECT_REPOSITORY_URL}/blob/main/NOTICE`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    NOTICE
+                  </a>
+                  声明。
+                </p>
+                <p>
+                  其他人再分发或继续二次开发时，请保留许可证、NOTICE、上游来源说明，
+                  并标出哪些文件或功能经过修改。第三方主题、字体、图标和商标仍归各自
+                  权利人所有。
+                </p>
+              </section>
 
               <section className="settings-card" aria-label="开源项目">
                 <a
@@ -879,7 +1175,7 @@ export function SettingsPanel({
                   aria-label={`在 GitHub 打开开源项目：${PROJECT_REPOSITORY_URL}`}
                 >
                   <span className="settings-row-label">
-                    开源地址
+                    项目主页
                     <small>{PROJECT_REPOSITORY_URL}</small>
                   </span>
                   <span className="settings-row-value">

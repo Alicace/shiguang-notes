@@ -50,15 +50,29 @@ const MARKDOWN_SHORTCUTS: Array<{
   label: string;
   accessibleLabel: string;
 }> = [
-  { action: "title", label: "# Title", accessibleLabel: "切换当前行标题级别" },
-  { action: "center", label: "[Center]", accessibleLabel: "居中当前行" },
-  { action: "list", label: "- List", accessibleLabel: "将当前行设为列表" },
+  // 与官方移动端一致：Markdown 模式下这条工具栏显示语法本身。
+  { action: "title", label: "# 标题", accessibleLabel: "切换当前行标题级别" },
+  { action: "center", label: "[ 居中 ]", accessibleLabel: "居中当前行" },
+  { action: "list", label: "- 列表", accessibleLabel: "将当前行设为列表" },
+  { action: "todo", label: "- [ ] 待办", accessibleLabel: "将当前行设为待办事项" },
   {
     action: "bold",
-    label: "**Bold**",
+    label: "**粗体**",
     accessibleLabel: "插入加粗标记或加粗所选文字",
   },
-  { action: "quote", label: "> Quote", accessibleLabel: "将当前行设为引用" },
+  { action: "quote", label: "> 引用", accessibleLabel: "将当前行设为引用" },
+  { action: "strike", label: "~~删除线~~", accessibleLabel: "给所选文字加删除线" },
+  { action: "code", label: "`代码`", accessibleLabel: "设置行内代码" },
+  { action: "hr", label: "— 分隔线", accessibleLabel: "插入分隔线" },
+  { action: "clear", label: "清除格式", accessibleLabel: "清除当前选区格式" },
+];
+
+const MOBILE_MARKDOWN_PRIMARY_ACTIONS: MarkdownShortcut[] = [
+  "title",
+  "center",
+  "list",
+  "bold",
+  "quote",
 ];
 
 function isHttpUrl(value: string): boolean {
@@ -176,6 +190,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(funct
   const [imageImportError, setImageImportError] = useState("");
   const [isDropTargetActive, setIsDropTargetActive] = useState(false);
   const [isQuickInputVisible, setIsQuickInputVisible] = useState(false);
+  const [isMarkdownMoreOpen, setIsMarkdownMoreOpen] = useState(false);
   const [activeImageKey, setActiveImageKey] = useState<string | null>(null);
   const [captionImageKey, setCaptionImageKey] = useState<string | null>(null);
   const [pendingImageDeletion, setPendingImageDeletion] = useState<{
@@ -198,6 +213,12 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(funct
   const editorContent = useMemo(
     () => splitEditorContent(markdown),
     [markdown],
+  );
+  const primaryMarkdownShortcuts = MARKDOWN_SHORTCUTS.filter((shortcut) =>
+    MOBILE_MARKDOWN_PRIMARY_ACTIONS.includes(shortcut.action),
+  );
+  const advancedMarkdownShortcuts = MARKDOWN_SHORTCUTS.filter(
+    (shortcut) => !MOBILE_MARKDOWN_PRIMARY_ACTIONS.includes(shortcut.action),
   );
 
   useEffect(() => {
@@ -1533,7 +1554,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(funct
           role="toolbar"
           aria-label="Markdown 快速输入"
         >
-          {MARKDOWN_SHORTCUTS.map((shortcut) => (
+          {primaryMarkdownShortcuts.map((shortcut) => (
             <button
               key={shortcut.action}
               type="button"
@@ -1546,6 +1567,35 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(funct
               {shortcut.label}
             </button>
           ))}
+          <button
+            type="button"
+            className={`markdown-quick-more-trigger${isMarkdownMoreOpen ? " is-active" : ""}`}
+            aria-label="更多 Markdown 排版"
+            aria-expanded={isMarkdownMoreOpen}
+            onPointerDown={(event) => event.preventDefault()}
+            onClick={() => setIsMarkdownMoreOpen((isOpen) => !isOpen)}
+          >
+            ⋯
+          </button>
+          {isMarkdownMoreOpen ? (
+            <div className="markdown-quick-more-menu" role="menu" aria-label="更多 Markdown 排版">
+              {advancedMarkdownShortcuts.map((shortcut) => (
+                <button
+                  key={shortcut.action}
+                  type="button"
+                  role="menuitem"
+                  aria-label={shortcut.accessibleLabel}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    handleMarkdownShortcut(shortcut.action);
+                    setIsMarkdownMoreOpen(false);
+                  }}
+                >
+                  {shortcut.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
       </aside>
