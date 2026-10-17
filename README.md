@@ -1,12 +1,13 @@
 <div align="center">
 
-<img src="public/brand/shiguang-app-icon.png" alt="拾光便签" width="144" />
+<img src="public/brand/shiguang-app-icon.png" alt="拾光便签" width="128" />
 
 # 拾光便签
 
-**面向飞牛 fnOS 的私有便签、富文本与共享空间应用**
+**把想法留在自己的 NAS。**
 
-数据保存在自己的 NAS，支持飞牛账号、独立账号、租户隔离、目录授权、公众号排版和长图导出。
+飞牛 fnOS 上的私有便签、富文本、共享空间与 NAS 文件授权应用。
+正文、图片和账号数据保存在本机，适合个人、家庭与小团队长期使用。
 
 [![Release](https://img.shields.io/github/v/release/Alicace/shiguang-notes?display_name=tag)](https://github.com/Alicace/shiguang-notes/releases)
 [![Downloads](https://img.shields.io/github/downloads/Alicace/shiguang-notes/total)](https://github.com/Alicace/shiguang-notes/releases)
@@ -14,85 +15,121 @@
 ![Node.js](https://img.shields.io/badge/Runtime-Node.js%2022-5FA04E)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
-[下载 Releases](https://github.com/Alicace/shiguang-notes/releases) ·
-[问题反馈](https://github.com/Alicace/shiguang-notes/issues) ·
-[更新日志](./CHANGELOG.md)
+[下载最新版本](https://github.com/Alicace/shiguang-notes/releases/latest) ·
+[查看更新日志](CHANGELOG.md) ·
+[问题反馈](https://github.com/Alicace/shiguang-notes/issues)
+
+当前版本：**0.9.1**
 
 </div>
 
----
+![拾光便签桌面富文本工作区](DOCS/assets/screenshots/desktop-rich-text.png)
 
-## 项目介绍
+## 一眼看懂
 
-拾光便签是一款为飞牛 fnOS 打包的原生便签应用。正文、图片、账号、共享空间和导出任务都保存在 NAS 本机，不需要把私人内容上传到第三方服务。
+拾光便签保留了安静、专注的纸张式书写体验，并把账号、权限、同步与导出都做成可在 NAS 上独立运行的能力。
 
-应用使用飞牛统一网关识别当前 NAS 用户，也支持管理员创建独立应用账号。每个账号拥有独立工作区与图片目录；共享空间由服务器检查成员权限，撤销权限后接口会立即拒绝访问。
+- **两种编辑方式**：富文本与 Markdown 随时切换，标题、列表、待办、引用、图片、字号和常用行内格式都可在工具栏完成。
+- **自己的数据目录**：便签和图片按账号隔离，保存在飞牛应用数据目录，不经过第三方云笔记服务。
+- **真正可管理的账号**：飞牛用户自动建立租户，管理员也能创建独立账号、设置密码、停用或删除账号。
+- **可控制的共享空间**：所有者可按已有账号添加成员，分配可编辑或只读权限，并随时撤销。
+- **贴近 NAS 的文件能力**：通过飞牛宿主目录选择器授权文件夹，授权记录在刷新、重开应用和切换空间后仍能恢复。
+- **从内容到发布**：支持 PNG 长图、公众号富文本、Markdown 工作区 ZIP 和离线 HTML 归档。
 
-当前版本：**v0.9.0**。
+## 产品页面
 
-## 主要功能
+> 以下图片来自开发机模拟租户中的真实页面，用演示便签与演示账号生成，不包含真实用户数据。
 
-| 模块 | 能力 |
+### 桌面工作区与富文本
+
+分类、搜索、星标、置顶和便签列表在左侧；标题级别、列表、待办、引用与行内格式在编辑状态栏直接完成。
+
+![桌面富文本编辑](DOCS/assets/screenshots/desktop-rich-text.png)
+
+### 实时预览与排版导出
+
+预览保持纸张排版，字号样式同步到 PNG、公众号和归档；导出入口集中在同一工作区。
+
+![实时预览与导出](DOCS/assets/screenshots/desktop-preview.png)
+
+<table>
+<tr>
+<td width="50%" align="center"><img src="DOCS/assets/screenshots/mobile-note-list.png" alt="手机便签列表" /></td>
+<td width="50%" align="center"><img src="DOCS/assets/screenshots/mobile-rich-text.png" alt="手机富文本编辑" /></td>
+</tr>
+<tr>
+<td align="center"><sub>手机便签列表与分类切换</sub></td>
+<td align="center"><sub>手机富文本工具栏与中文说明</sub></td>
+</tr>
+</table>
+
+### 共享空间
+
+从已有账号直接添加成员，按「可编辑 / 只读」授权；私有便签与共享工作区分别保存。
+
+![共享空间与成员权限](DOCS/assets/screenshots/shared-spaces.png)
+
+### 账号与用户管理
+
+管理员可查看飞牛账号和应用独立账号，为其他账号设置密码，并控制停用与删除。普通用户不会看到管理入口。
+
+![用户管理与账号租户](DOCS/assets/screenshots/user-management.png)
+
+### 关于、版本与更新
+
+版本检查读取静态清单，不消耗 GitHub API 次数；下载后校验 FPK 大小与 SHA-256，再交给飞牛安装器。
+
+![关于与版本更新](DOCS/assets/screenshots/about-and-updates.png)
+
+<p align="center">
+  <img src="DOCS/assets/screenshots/login.png" alt="拾光便签登录页" width="640" />
+</p>
+
+## 主要能力
+
+| 模块 | 可做的事情 |
 | --- | --- |
-| 便签工作区 | 多便签、分类、搜索、星标、置顶、拖拽排序、回收站与自动保存 |
-| 富文本模式 | 标题、居中、列表、待办、引用、粗体、斜体、下划线、删除线、行内代码、图片块和字号调节 |
-| Markdown 模式 | 官方风格快捷输入、实时预览、快捷键和 Markdown/富文本样式同步 |
-| 账号与租户 | 飞牛账号自动登录、独立账号、管理员建号/停用/删除、管理员设置密码 |
-| 共享空间 | 所有者、编辑、只读成员，支持从已有账号添加成员和撤销权限 |
-| 文件授权 | 飞牛宿主目录选择器、授权记录持久化、真实路径校验与 ACL 反馈 |
-| 图片与导出 | NAS/本地图片导入、标注、裁剪、PNG、公众号富文本、Markdown ZIP 和离线 HTML |
-| 安全 | 登录失败退避、CSRF 与租户绑定、同源登录校验、路径穿越防护和独立包用户运行 |
-| 版本更新 | 静态版本清单、国内加速下载、FPK 大小与 SHA-256 校验、自动调起飞牛安装器 |
-| AI 与扩展 | AI 审阅、Skill、DSH 插件和自定义公众号配置 |
+| 写作与整理 | 多便签、文件夹、搜索、星标、置顶、拖拽排序、回收站、自动保存 |
+| 富文本 | 正文 / 标题 1 / 标题 2 / 标题 3、居中、列表、待办、引用、粗体、斜体、下划线、删除线、行内代码、图片块、四种字号、清除格式 |
+| Markdown | 实时预览、快捷输入、常用快捷键、表格与代码块渲染、Markdown 与富文本往返 |
+| 账号与租户 | 飞牛账号自动登录、独立应用账号、管理员建号、密码设置与重置、停用与删除、数据隔离 |
+| 共享协作 | 独立共享空间、成员增删、编辑 / 只读权限、服务端权限校验、私有 / 共享工作区切换 |
+| 图片与附件 | 电脑本地导入、NAS 授权目录读取、粘贴截图、拖入图片、裁剪、标注与下载 |
+| 目录授权 | 飞牛目录选择器、授权持久化、真实路径检查、读写删权限反馈、NAS 图片路径校验 |
+| 导出 | 主题 PNG 长图、公众号富文本、单篇 Markdown 归档、完整工作区 ZIP、离线 HTML |
+| 外观 | 暖白纸感、深夜便签、iPhone 浅色 / 深色、Bear、暖色杂志、Telegra.ph |
+| 更新 | 静态版本清单、国内加速回退、FPK 体积与 SHA-256 校验、原生安装器衔接 |
+| 扩展 | AI 审阅、Workspace API Skill、DeepSeek Harness 插件、公众号与图床配置入口 |
 
-## 相比上游新增
+## 安装
 
-本项目基于 [zhaoolee/notes](https://github.com/zhaoolee/notes) `1.12.0` 的代码继续开发。相对上游，飞牛版本新增和调整了：
+1. 从 [Releases](https://github.com/Alicace/shiguang-notes/releases/latest) 下载最新的 x86_64 `.fpk`。
+2. 打开飞牛「应用中心 → 手动安装」，选择安装包。
+3. 从桌面启动拾光便签，使用 NAS 登录，或输入管理员创建的独立账号。
+4. 在「设置 → 文件授权」中授权需要读取图片的 NAS 目录。
+5. NAS 管理员可在「设置 → 账号与同步 → 用户管理」创建普通账号。
 
-- 完整 FPK 原生封装、飞牛统一网关登录、专用包用户和 Unix Socket 服务。
-- 飞牛账号、应用独立账号、管理员用户管理与按租户隔离的数据/图片/共享空间。
-- 原生共享空间成员管理，以及编辑、只读和撤销授权。
-- 目录选择、授权持久化、真实路径与 ACL 校验。
-- 富文本编辑内核、常用格式互斥、图片块、字号档位、桌面与手机工具栏重排。
-- 手机保存落盘、重开恢复、页面离开保存，以及空工作区不自动新建便签。
-- 原生应用内修改密码、管理员设置新密码和可靠的退出登录。
-- 全新自绘应用图标、登录页图标与页脚品牌；界面不再使用旧品牌名称。
-- 静态版本清单和不依赖 GitHub API 的更新检查，支持国内加速与安装包校验。
-- 飞牛原生设置、服务配置、诊断和关于说明重整。
-
-## 快速上手
-
-1. 从 [Releases](https://github.com/Alicace/shiguang-notes/releases) 下载最新 `.fpk`。
-2. 在飞牛「应用中心 → 手动安装」中选择安装包。
-3. 安装完成后从桌面打开拾光便签，使用 NAS 登录或应用账号登录。
-4. 在「设置 → 文件授权」中授权需要访问的目录。
-5. 在「设置 → 账号与同步」中创建普通账号或修改密码；NAS 管理员还可管理其他账号。
+当前安装包面向 **x86_64** 飞牛设备，应用服务使用 Node.js 22 运行。
 
 ## 自动更新
 
-应用读取仓库根目录的公开 `version.json`，不会调用 GitHub Releases API，因此不会消耗 GitHub API 配额。
+应用读取仓库根目录的公开 [`version.json`](version.json)，不会调用 GitHub Releases API。
 
-检查顺序为国内加速镜像、GitHub Raw 和 jsDelivr。发现新版本后，管理员点击升级按钮即可：
+发现新版本后，管理员可下载 FPK；服务端会检查文件大小、gzip / FPK 头和 SHA-256，通过后写入 NAS 应用数据目录并调起飞牛安装器。下载依次尝试国内加速镜像、GitHub Raw 与 jsDelivr。
 
-1. 从 GitHub Release 或国内加速镜像下载 FPK。
-2. 校验清单中的文件大小、FPK 格式和 SHA-256。
-3. 把安装包写入 NAS 应用数据目录。
-4. 调起飞牛安装器；最终安装确认由 fnOS 应用中心完成。
+## 数据与安全
 
-发布 `v*` 标签时，GitHub Actions 会构建 FPK、生成 `version.json`、创建 Release 并更新静态清单。
-
-## 隐私与安全
-
-- 便签和图片保存在 NAS 的应用数据目录中，不经过第三方便签服务。
-- 共享空间权限由服务端检查，不能只靠前端隐藏按钮绕过。
-- 登录和管理写操作要求会话、租户绑定和 CSRF 校验。
-- 登录密码连续失败会按账号与来源退避，降低在线爆破风险。
-- 更新包只接受本项目 GitHub Release 与固定加速镜像，并强制校验 SHA-256。
-- 不建议把服务进程改为 root；当前安装包按专用包用户运行。
+- 正文与图片按账号 ID 隔离，不写入浏览器持久缓存。
+- 共享空间与目录访问由服务端检查，不能只靠隐藏前端按钮绕过。
+- 写操作要求会话、租户绑定与 CSRF 校验。
+- 密码连续失败会按「账号 + 来源」退避，降低在线爆破风险。
+- 目录与 NAS 图片请求会检查真实路径，拒绝路径穿越和未授权目录。
+- 更新包只接受指定 Release 资源和固定加速镜像，并强制校验 SHA-256。
+- 应用服务按专用包用户运行；不建议改为 root。
 
 ## 本地构建
 
-需要 Node.js 22、飞牛 `fnpack 1.2.3` 与 Linux x64 运行依赖：
+需要 Node.js 22、飞牛 `fnpack 1.2.3` 与 Linux x86_64 原生运行依赖：
 
 ```bash
 npm ci
@@ -101,26 +138,19 @@ npm run fnos:build
 npm run fnos:pack
 ```
 
-产物为 `fnnotes-m0.fpk`。发布构建也已在 [`.github/workflows/fnos-release.yml`](./.github/workflows/fnos-release.yml) 中配置。
-
-## 来源与许可
-
-拾光便签是基于上游 [zhaoolee/notes](https://github.com/zhaoolee/notes) 的二次开发项目，感谢原作者及所有贡献者。
-
-上游与本项目自有代码采用 [Apache License 2.0](./LICENSE)，原始版权和 [NOTICE](./NOTICE) 声明继续保留。其他开发者再发布或继续二次开发时，请：
-
-- 保留 `LICENSE`、`NOTICE` 和上游来源说明；
-- 在修改过的文件中保留醒目的修改说明；
-- 不要暗示本项目或上游作者为你的修改背书；
-- 单独核实第三方主题、字体、图标、名称与商标的授权范围。
-
-本项目与飞牛官方无隶属关系。第三方组件、主题名称、字体和图片不因 Apache License 2.0 被重新授权。
+构建产物为 `fnnotes-m0.fpk`。原生服务、前端、许可证和图标资源会一起写入安装包。
 
 ## 问题反馈
 
 请在 [Issues](https://github.com/Alicace/shiguang-notes/issues) 中提供：
 
-- 飞牛版本、应用版本和 NAS 架构；
-- 问题出现在浏览器、飞牛桌面窗口还是手机；
-- 可复现的点击步骤；
-- 不含密码、Token、隐私正文和完整 NAS 路径的错误信息。
+- 飞牛版本、拾光便签版本与 NAS 架构；
+- 问题发生在飞牛桌面、浏览器还是手机；
+- 可复现的点击步骤和预期结果；
+- 不含密码、Token、隐私正文与完整 NAS 路径的错误信息。
+
+## 感谢与许可
+
+感谢 [zhaoolee/notes](https://github.com/zhaoolee/notes) 与所有开源贡献者的早期工作。拾光便签在此基础上完成了飞牛原生封装和大量功能扩展；项目依据 [Apache License 2.0](LICENSE) 发布，原始版权与 [NOTICE](NOTICE) 声明继续保留。
+
+本项目与飞牛官方无隶属关系。第三方主题、字体、图标和商标仍归各自权利人所有。

@@ -2,6 +2,14 @@
 
 本文件记录拾光便签中值得用户关注的变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.9.1] - 2026-10-17
+
+### 变更
+
+- 登录页、浏览器 favicon、应用内品牌入口、关于页、飞牛应用中心和桌面统一换成新的拟物便签图标；64 / 256 px 与网页图标都从同一张 1024 px 源图生成。
+- 重写 GitHub 首页：以拾光便签自身功能为主，前置桌面、手机、富文本、共享空间、用户管理和版本更新等真实页面截图；上游来源只在底部感谢与许可中简短说明。
+- 「关于」页改为优先展示主要能力，版本说明不再把上游关系放在首行；感谢与 Apache-2.0 / NOTICE 说明保留在底部。
+
 ## [0.9.0] - 2026-10-17
 
 ### 新增
@@ -413,6 +421,7 @@
 - PC 版便签操作栏右侧按钮调整为“AI、删除、分享”的顺序，与 APP 版详情操作保持一致。
 - 重置 Hermes 安装链接前会明确提示旧链接立即失效，并要求二次确认，避免误触轮换。
 
+[0.9.1]: https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.1
 [0.9.0]: https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.0
 [1.12.0]: https://github.com/zhaoolee/notes/compare/1.11.2...1.12.0
 [1.11.2]: https://github.com/zhaoolee/notes/compare/1.11.1...1.11.2

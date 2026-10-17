@@ -2439,7 +2439,6 @@ export default function App() {
       aiAvailable={aiAvailable}
       aiEnabled={aiEnabled}
       appVersion={isNative ? nativeMetadata.appVersion : ""}
-      upstreamVersion={isNative ? nativeMetadata.upstreamVersion : ""}
       appPasswordConfigured={hasNativeAppPassword}
       authUsername={authUser?.username}
       canChangePassword={authUser?.role === "user"}

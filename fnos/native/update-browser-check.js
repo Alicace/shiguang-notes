@@ -2,21 +2,21 @@ async (page) => {
   const base = "http://127.0.0.1:18338/app/fnnotes-m0/";
   const adminBase = "http://127.0.0.1:18340/app/fnnotes-m0/";
   const manifest = {
-    currentVersion: "0.9.0",
+    currentVersion: "0.9.1",
     hasUpdate: true,
     installable: true,
     latest: {
-      version: "0.9.1",
+      version: "0.9.2",
       publishedAt: "2026-10-17",
       releaseNotes: "更新检查交互测试",
       releaseUrl:
-        "https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.1",
+        "https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.2",
       asset: {
-        name: "fnnotes-m0_0.9.1_x86_64.fpk",
+        name: "fnnotes-m0_0.9.2_x86_64.fpk",
         size: 1024,
         sha256: "a".repeat(64),
         urls: [
-          "https://github.com/Alicace/shiguang-notes/releases/download/v0.9.1/fnnotes-m0_0.9.1_x86_64.fpk",
+          "https://github.com/Alicace/shiguang-notes/releases/download/v0.9.2/fnnotes-m0_0.9.2_x86_64.fpk",
         ],
       },
     },
@@ -43,7 +43,7 @@ async (page) => {
     (node) => node.complete && node.naturalWidth >= 72,
   );
   if (!loaded) throw new Error("登录页拾光图标没有正常加载。");
-  await page.screenshot({ path: "output/playwright/login-branding-090.png" });
+  await page.screenshot({ path: "output/playwright/login-branding-091.png" });
   await page.locator(".login-dialog-nas-button").click();
   await page.locator(".confirm-dialog-actions .primary").click();
 
@@ -56,9 +56,9 @@ async (page) => {
   await page.getByRole("button", { name: "打开设置", exact: true }).click();
   await page.getByRole("button", { name: "关于", exact: true }).click();
   await page.waitForFunction(() => !document.getElementById("settings-pane-about").hidden);
-  await page.getByText("发现新版本 0.9.1", { exact: true }).waitFor();
-  await page.getByText("0.9.1", { exact: true }).first().waitFor();
-  const upgrade = page.getByRole("button", { name: /查看 0\.9\.1 新版本/ });
+  await page.getByText("发现新版本 0.9.2", { exact: true }).waitFor();
+  await page.getByText("0.9.2", { exact: true }).first().waitFor();
+  const upgrade = page.getByRole("button", { name: /查看 0\.9\.2 新版本/ });
   await upgrade.waitFor();
   const upstream = page.getByRole("link", { name: "zhaoolee/notes", exact: true });
   if ((await upstream.getAttribute("href")) !== "https://github.com/zhaoolee/notes") {
@@ -92,9 +92,9 @@ async (page) => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          path: "/tmp/fnnotes-m0_0.9.1_x86_64.fpk",
+          path: "/tmp/fnnotes-m0_0.9.2_x86_64.fpk",
           reused: false,
-          version: "0.9.1",
+          version: "0.9.2",
         }),
       });
     });
@@ -111,7 +111,7 @@ async (page) => {
     await adminPage.locator(".app-layout").waitFor({ timeout: 20000 });
     await adminPage.getByRole("button", { name: "打开设置", exact: true }).click();
     await adminPage.getByRole("button", { name: "关于", exact: true }).click();
-    await adminPage.getByRole("button", { name: /升级到 0\.9\.1/ }).click();
+    await adminPage.getByRole("button", { name: /升级到 0\.9\.2/ }).click();
     await adminPage.getByText(/安装包已下载并校验/).waitFor({ timeout: 10000 });
     if (!downloadRequested) throw new Error("管理员点击升级后没有请求下载安装包。");
   } finally {
@@ -121,7 +121,7 @@ async (page) => {
   return {
     passed: true,
     loginIcon: "brand/shiguang-app-icon.png",
-    update: "0.9.0 → 0.9.1",
+    update: "0.9.1 → 0.9.2",
     adminDownload: true,
     upstream: "zhaoolee/notes",
   };

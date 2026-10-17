@@ -1,5 +1,5 @@
 appname=fnnotes-m0
-version=0.9.0
+version=0.9.1
 display_name=拾光便签
 desc=拾光便签：NAS 上的私有便签与共享空间，使用飞牛账号登录，支持七种纸张主题、插入图片、导出 PNG 与公众号排版。
 platform=x86

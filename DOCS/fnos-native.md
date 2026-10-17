@@ -1,6 +1,6 @@
 # 拾光便签完整原生适配
 
-日期：2026-10-17。上游 1.12.0；原生应用独立版本 0.9.0。
+日期：2026-10-17。上游 1.12.0；原生应用独立版本 0.9.1。
 
 ## 范围
 
@@ -20,7 +20,7 @@
 
 0.2.2 打包修复：Node 文件复制保留原软链接形式，生产运行目录清理所有 npm `.bin` 命令目录和不使用的 TypeScript 编译器；其余软链接直接阻止构建。旧包存在 9 条指向开发机 `/Users/...` 的链接，不能将本机 tar 能读出归档视为 NAS 解压兼容。`package-files.test.mjs` 覆盖绝对/相对、嵌套命令链接、编译器删除及意外外部链接。
 
-应用中心、桌面、登录页与页眉统一使用自绘的 `public/brand/shiguang-app-icon.png`（便签纸 + 笔），64/256 px 从同一张 1024 px 源图缩放；内置页脚标志为 `public/brand/shiguang-footer-logo.png`。详情见 `fnos-icon.md`。
+应用中心、桌面、登录页与页眉统一使用用户提供的 `public/brand/shiguang-app-icon.png`（便签纸 + 绿色铅笔 + 回形针），64/256 px 从同一张 1024 px 源图缩放；内置页脚标志为 `public/brand/shiguang-footer-logo.png`。详情见 `fnos-icon.md`。
 
 ## 数据与权限
 
@@ -78,7 +78,7 @@ Skill/DSH 的应用 Token 不能替代飞牛网关登录态。客户端配置自
 
 0.7.6 换品牌、修顶栏排版并补齐设置面板节奏：
 
-- **品牌替换**：界面、登录页、向导、公众号署名、Skill 与 DSH 插件文案统一为「拾光便签」；页脚标志使用自绘 `public/brand/shiguang-footer-logo.png`，应用图标与登录页图标使用自绘 `public/brand/shiguang-app-icon.png`（`fnos/tools/make_brand_assets.mjs` 生成）。旧署名在首次打开时迁移为「由拾光便签发送」。
+- **品牌替换**：界面、登录页、向导、公众号署名、Skill 与 DSH 插件文案统一为「拾光便签」；页脚标志使用自有 `public/brand/shiguang-footer-logo.png`，应用图标与登录页图标使用用户提供的 `public/brand/shiguang-app-icon.png`（`fnos/tools/make_brand_assets.mjs` 只生成页脚标志，不覆盖应用图标）。旧署名在首次打开时迁移为「由拾光便签发送」。
 - **排版模式下拉**：按最长档位「Markdown 模式」定宽 158 px（原来 124 px，切到 Markdown 档位时文案压在边框与箭头上）；选单项 52 → 44 px 并在项间加细分隔线；选中项与标识列间距 6 → 10 px。
 - **顶栏收起断点**：日期字数 ≤1720 px 收起、字号档位 ≤1340 px 收起、富文本工具栏 ≤1459 px 用 20 px 按钮且无间距。逐 10 px 扫 900–2200 px 后，1140/1220/1320–1380/1420–1440 px 这几个断点交界处的顶栏溢出（最右专注按钮被挤出）已经消失；862–1024 px 的三栏布局顶栏仍放不下，属于既有最小宽度限制（见 `rich-text-mode.md` 第 11 节）。
 - **设置面板节奏**：共享空间 / 文件授权 / 飞牛与诊断改用与其它分类相同的 24 px 标题下间距。

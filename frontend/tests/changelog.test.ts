@@ -32,7 +32,7 @@ test("CHANGELOG 使用固定的人类可读格式记录版本", () => {
   assert.match(changelog, /^# 更新日志\n/);
   assert.equal(
     secondLevelHeadings[hasUnreleasedSection ? 1 : 0],
-    "[0.9.0] - 2026-10-17",
+    "[0.9.1] - 2026-10-17",
   );
   assert.ok(
     secondLevelHeadings.includes(`[${packageVersion.version}] - 2026-10-11`),
@@ -153,6 +153,16 @@ test("changelog 解析器保留便签分节并解析版本比较链接", () => {
     heading: string;
     content: RegExp[];
   }> = [
+    {
+      version: "0.9.1",
+      heading:
+        "[0.9.1](https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.1) - 2026-10-17",
+      content: [
+        /新的拟物便签图标.*64.*256.*1024/s,
+        /重写 GitHub 首页.*真实页面截图.*上游来源.*底部感谢/s,
+        /关于.*主要能力.*版本说明.*Apache-2\.0.*NOTICE/s,
+      ],
+    },
     {
       version: "0.9.0",
       heading:

@@ -36,7 +36,6 @@ interface SettingsPanelProps {
   aiEnabled?: boolean;
   appPasswordConfigured?: boolean;
   appVersion?: string;
-  upstreamVersion?: string;
   authUsername?: string | null;
   canConfigureWechat?: boolean;
   canChangePassword?: boolean;
@@ -106,7 +105,6 @@ export function SettingsPanel({
   aiAvailable = false,
   aiEnabled = false,
   appVersion = "",
-  upstreamVersion = "",
   appPasswordConfigured = true,
   authUsername = null,
   canConfigureWechat = false,
@@ -1056,9 +1054,7 @@ export function SettingsPanel({
                   <div className="settings-row">
                     <span className="settings-row-label">
                       拾光便签版本
-                      <small>
-                        飞牛原生应用，基于上游 {upstreamVersion || "开源版本"} 二次开发
-                      </small>
+                      <small>飞牛 fnOS 私有便签与共享空间应用</small>
                     </span>
                     <span className="settings-row-value settings-version-value">
                       {appVersion}
@@ -1130,17 +1126,13 @@ export function SettingsPanel({
               </section>
 
               <section className="settings-card settings-project-credit" aria-label="来源与许可">
-                <h4>来源与开源许可</h4>
+                <h4>感谢与开源许可</h4>
                 <p>
-                  本项目基于
-                  {" "}
+                  感谢{" "}
                   <a href={UPSTREAM_REPOSITORY_URL} target="_blank" rel="noopener noreferrer">
                     zhaoolee/notes
                   </a>
-                  {" "}
-                  {upstreamVersion ? `${upstreamVersion} ` : ""}
-                  二次开发，感谢原作者与所有贡献者。上游项目采用
-                  {" "}
+                  {" "}与所有贡献者的开源工作。项目代码依据{" "}
                   <a
                     href={`${PROJECT_REPOSITORY_URL}/blob/main/LICENSE`}
                     target="_blank"
@@ -1148,8 +1140,7 @@ export function SettingsPanel({
                   >
                     Apache License 2.0
                   </a>
-                  ；
-                  本项目的修改、飞牛原生封装和新功能沿用同一许可，并保留原始版权与
+                  {" "}发布，原始版权与{" "}
                   <a
                     href={`${PROJECT_REPOSITORY_URL}/blob/main/NOTICE`}
                     target="_blank"
@@ -1157,13 +1148,9 @@ export function SettingsPanel({
                   >
                     NOTICE
                   </a>
-                  声明。
+                  {" "}声明继续保留。
                 </p>
-                <p>
-                  其他人再分发或继续二次开发时，请保留许可证、NOTICE、上游来源说明，
-                  并标出哪些文件或功能经过修改。第三方主题、字体、图标和商标仍归各自
-                  权利人所有。
-                </p>
+                <p>再分发时请保留许可证与 NOTICE；第三方主题、字体、图标和商标仍归各自权利人所有。</p>
               </section>
 
               <section className="settings-card" aria-label="开源项目">

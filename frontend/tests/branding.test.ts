@@ -33,7 +33,7 @@ test("用户可见的当前界面不再包含旧品牌或艺人主题名", () =>
   assert.match(text("src/lib/themes.ts"), /暖色杂志/);
 });
 
-test("应用图标是 1024 x 1024 的 PNG 自绘资源", () => {
+test("应用图标是 1024 x 1024 的用户提供 PNG 资源", () => {
   const png = readFileSync("public/brand/shiguang-app-icon.png");
   assert.deepEqual([...png.subarray(1, 4)], [...Buffer.from("PNG")]);
   assert.equal(png.readUInt32BE(16), 1024);
