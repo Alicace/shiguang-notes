@@ -5,8 +5,8 @@
   "release_notes": "- 更新进度会持续显示，不再被后台检查覆盖或中途消失。\n- 下载完成后自动调用飞牛应用中心覆盖安装，新版本启动后自动刷新。\n- 安装失败会显示原因并保留安装包，不再停留在“正在打开安装器”。\n- 0.9.4 及更早版本的更新器没有安装能力，首次升级 0.9.5 需在应用中心手动安装一次；此后自动更新生效。",
   "asset": {
     "name": "fnnotes-m0_0.9.5_x86_64.fpk",
-    "size": 69409841,
-    "sha256": "bf92b8ceb98ef2f3364236f626e36f5057836cf9a323876d6a267756cfa196cd",
+    "size": 73154284,
+    "sha256": "0893b5784eabd0dfbdcd5eeae1eca5b943daa6ea21c90620480f4bf12a648f9b",
     "urls": [
       "https://github.com/Alicace/shiguang-notes/releases/download/v0.9.5/fnnotes-m0_0.9.5_x86_64.fpk",
       "https://ghfast.top/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.5/fnnotes-m0_0.9.5_x86_64.fpk",
