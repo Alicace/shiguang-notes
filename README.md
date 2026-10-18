@@ -19,7 +19,7 @@
 [查看更新日志](CHANGELOG.md) ·
 [问题反馈](https://github.com/Alicace/shiguang-notes/issues)
 
-当前版本：**0.9.4**
+当前版本：**0.9.5**
 
 </div>
 

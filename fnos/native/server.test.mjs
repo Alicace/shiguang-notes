@@ -8,6 +8,7 @@ import http from "node:http";
 import { once } from "node:events";
 import { NotesClient } from "../../dsh-plugin/lib/notes-client.js";
 import metadata from "../../src/native/metadata.json" with { type: "json" };
+import { startAppcenterInstall } from "../../dist-server/server/updates/native-installer.js";
 
 const prefix = "/app/fnnotes-m0";
 let directory, socket, child;
@@ -167,6 +168,23 @@ test("程序信息不返回凭据，后台截图与管理员接口在原生模�
   assert.equal((await request("/api/fnos/config")).status, 403);
   assert.equal((await request("/api/archive", { method: "POST", token, body: { markdownPath: "/etc/passwd", theme: "default" } })).status, 500);
   assert.equal((await request("/api/workspace", { method: "PUT", token, extra: { "X-Shiguang-User": "nas-1002" }, body: { workspace: workspace("旧账号草稿") } })).status, 403);
+  assert.equal(
+    (await request("/api/fnos/update/install", {
+      method: "POST",
+      token,
+      body: { jobId: "missing" },
+    })).status,
+    403,
+  );
+  assert.equal(
+    (await request("/api/fnos/update/install", {
+      uid: 1003,
+      method: "POST",
+      token: await session(1003),
+      body: { jobId: "missing" },
+    })).status,
+    404,
+  );
 });
 
 test("目录授权刷新后从持久化记录恢复，浏览器不能写入任意路径", async () => {
@@ -251,6 +269,41 @@ test("宿主选择器在系统 API 未就绪时可登记真实目录，缺少 Or
     omitOrigin: true,
   });
   assert.equal(space.status, 201);
+});
+test("自更新通过飞牛 appcenter-cli 脱离 Web 进程安装", async () => {
+  const updates = path.join(directory, "updates");
+  const packagePath = path.join(updates, "fnnotes-m0_9.9.9_x86_64.fpk");
+  const outputPath = path.join(directory, "appcenter-args");
+  const cliPath = path.join(directory, "appcenter-cli");
+  await mkdir(updates, { recursive: true });
+  await writeFile(packagePath, "fake-fpk");
+  await writeFile(
+    cliPath,
+    `#!/bin/sh\nprintf '%s\\n' "$@" > '${outputPath}'\nexit 0\n`,
+    { mode: 0o755 },
+  );
+  const previousCli = process.env.SHIGUANG_APPCENTER_CLI;
+  const previousDirect = process.env.SHIGUANG_APPCENTER_DIRECT;
+  process.env.SHIGUANG_APPCENTER_CLI = cliPath;
+  process.env.SHIGUANG_APPCENTER_DIRECT = "1";
+  try {
+    await startAppcenterInstall(packagePath, directory);
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      try {
+        const args = await readFile(outputPath, "utf8");
+        assert.deepEqual(args.trim().split("\n"), ["install-fpk", packagePath]);
+        return;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+    assert.fail("appcenter-cli 没有被调用");
+  } finally {
+    if (previousCli === undefined) delete process.env.SHIGUANG_APPCENTER_CLI;
+    else process.env.SHIGUANG_APPCENTER_CLI = previousCli;
+    if (previousDirect === undefined) delete process.env.SHIGUANG_APPCENTER_DIRECT;
+    else process.env.SHIGUANG_APPCENTER_DIRECT = previousDirect;
+  }
 });
 
 test("写令牌由持久化密钥派生，服务重启后仍可写且绑定当前账号", async () => {

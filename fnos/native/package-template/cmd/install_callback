@@ -1,5 +1,4 @@
 #!/bin/bash
 
-### This script is called after the user installs the application.
-
-exit 0
+set -eu
+exec "$(dirname "$0")/prepare_update_permission"

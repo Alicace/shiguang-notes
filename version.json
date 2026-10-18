@@ -1,16 +1,16 @@
 {
-  "version": "0.9.4",
-  "release_url": "https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.4",
+  "version": "0.9.5",
+  "release_url": "https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.5",
   "published_at": "2026-10-18",
-  "release_notes": "- 修复管理员创建的普通账号在飞牛 WebView 中无法登录的问题。\n- 支持其他 NAS 用户进入各自租户；只有 NAS 管理员账号拥有管理权限。\n- 修复手机端保存按钮和手机、桌面之间的双向同步。",
+  "release_notes": "- 更新进度会持续显示，不再被后台检查覆盖或中途消失。\n- 下载完成后自动调用飞牛应用中心覆盖安装，新版本启动后自动刷新。\n- 安装失败会显示原因并保留安装包，不再停留在“正在打开安装器”。\n- 0.9.4 及更早版本的更新器没有安装能力，首次升级 0.9.5 需在应用中心手动安装一次；此后自动更新生效。",
   "asset": {
-    "name": "fnnotes-m0_0.9.4_x86_64.fpk",
-    "size": 73143458,
-    "sha256": "1a2becc8d4e77fd505b17b2fb7bd0da10991f7dbcc9ffa8a65a80b03b6137f32",
+    "name": "fnnotes-m0_0.9.5_x86_64.fpk",
+    "size": 69409841,
+    "sha256": "bf92b8ceb98ef2f3364236f626e36f5057836cf9a323876d6a267756cfa196cd",
     "urls": [
-      "https://github.com/Alicace/shiguang-notes/releases/download/v0.9.4/fnnotes-m0_0.9.4_x86_64.fpk",
-      "https://ghfast.top/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.4/fnnotes-m0_0.9.4_x86_64.fpk",
-      "https://gh-proxy.com/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.4/fnnotes-m0_0.9.4_x86_64.fpk"
+      "https://github.com/Alicace/shiguang-notes/releases/download/v0.9.5/fnnotes-m0_0.9.5_x86_64.fpk",
+      "https://ghfast.top/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.5/fnnotes-m0_0.9.5_x86_64.fpk",
+      "https://gh-proxy.com/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.5/fnnotes-m0_0.9.5_x86_64.fpk"
     ]
   }
 }

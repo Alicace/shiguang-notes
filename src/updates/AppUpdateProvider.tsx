@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { appPath, isNative } from "../lib/fnos-client.js";
-import { nativeJson, nativeWrite } from "../native/api.js";
+import { NativeApiError, nativeJson, nativeWrite } from "../native/api.js";
 import {
   fetchLatestAppUpdate,
   isNewerVersion,
@@ -57,7 +57,7 @@ interface UpdateJobResponse {
   progress: AppUpdateProgress;
   repeated: boolean;
   source?: string;
-  status: "queued" | "downloading" | "ready" | "error";
+  status: "queued" | "downloading" | "ready" | "installing" | "error";
   version: string;
 }
 
@@ -143,6 +143,7 @@ export function AppUpdateProvider({
     useState<UpdateIntervalHours>(readUpdateInterval);
   const [lastCheckedAt, setLastCheckedAt] = useState(readLastUpdateCheck);
   const checkingRef = useRef(false);
+  const updateActiveRef = useRef(false);
   const intervalRef = useRef(intervalHours);
 
   useEffect(() => {
@@ -172,7 +173,7 @@ export function AppUpdateProvider({
 
   const checkForUpdates = useCallback(
     async (manual = false) => {
-      if (!appVersion || checkingRef.current) return;
+      if (!appVersion || checkingRef.current || updateActiveRef.current) return;
       checkingRef.current = true;
       setStatus("checking");
       setMessage(manual ? "正在检查新版本…" : "正在后台检查新版本…");
@@ -252,13 +253,37 @@ export function AppUpdateProvider({
     }
   }, [dismissedVersion, latestUpdate, status]);
 
-  const waitForNewVersion = useCallback(async (oldVersion: string) => {
+  const waitForNewVersion = useCallback(async (
+    oldVersion: string,
+    installJobId?: string,
+  ) => {
     setStatus("waiting-restart");
     setMessage(
-      "安装器已打开。请在飞牛确认升级，安装完成后页面会自动刷新。",
+      "升级已交给飞牛应用中心，正在等待新版本启动…",
     );
     for (let attempt = 0; attempt < 120; attempt += 1) {
       await wait(2_000);
+      if (installJobId && attempt === 1) {
+        try {
+          const job = await nativeJson<UpdateJobResponse>(
+            `/api/fnos/update/download/${installJobId}`,
+          );
+          if (job.status === "error") {
+            updateActiveRef.current = false;
+            setStatus("error");
+            setMessage(job.error || "飞牛应用中心没有完成升级。");
+            return;
+          }
+        } catch (error) {
+          // 应用中心开始升级时服务会短暂断开，这属于正常重启过程。
+          if (error instanceof NativeApiError && error.status < 500) {
+            updateActiveRef.current = false;
+            setStatus("error");
+            setMessage(error.message);
+            return;
+          }
+        }
+      }
       try {
         const response = await fetch(appPath("/api/program-info"), {
           cache: "no-store",
@@ -274,15 +299,30 @@ export function AppUpdateProvider({
         // 应用升级期间服务会短暂断开，继续等待新进程恢复。
       }
     }
-    setStatus("ready");
-    setMessage("安装包已下载并校验，请完成飞牛安装器中的确认步骤。");
+    updateActiveRef.current = false;
+    setStatus("error");
+    setMessage(
+      "等待升级超时，未检测到新版本。请查看 NAS 上的 update-install.log，或在应用中心手动安装已下载的 FPK。",
+    );
   }, []);
 
-  const launchInstaller = useCallback(async (path: string) => {
+  const launchInstaller = useCallback(async (path: string, jobId?: string) => {
     if (!path) return;
     setStatus("installing");
-    setMessage("正在打开飞牛安装器…");
+    setMessage(
+      jobId
+        ? "正在调用飞牛应用中心执行覆盖安装…"
+        : "正在打开安装包位置…",
+    );
     try {
+      if (jobId) {
+        await nativeJson(
+          "/api/fnos/update/install",
+          nativeWrite({ jobId }),
+        );
+        await waitForNewVersion(appVersion, jobId);
+        return;
+      }
       const { TrimApp } = await import("@trimjs/web-app");
       const app = new TrimApp();
       await app.ready();
@@ -293,11 +333,13 @@ export function AppUpdateProvider({
         setMessage(
           "安装包已通过校验并定位到文件管理器，请双击 FPK 完成飞牛升级。",
         );
+        updateActiveRef.current = false;
         setStatus("ready");
         return;
       }
       await waitForNewVersion(appVersion);
     } catch (error) {
+      updateActiveRef.current = false;
       setStatus("error");
       setMessage(
         error instanceof Error
@@ -320,6 +362,7 @@ export function AppUpdateProvider({
       return;
     }
     setIsPromptOpen(true);
+    updateActiveRef.current = true;
     setStatus("downloading");
     setProgress(DEFAULT_PROGRESS);
     setMessage("正在选择最快的下载线路…");
@@ -352,7 +395,7 @@ export function AppUpdateProvider({
           setStatus("ready");
           setMessage("安装包已通过 SHA-256 校验，正在启动安装器…");
           await wait(150);
-          await launchInstaller(job.path);
+          await launchInstaller(job.path, started.jobId);
           return;
         }
         if (job.progress.stage === "verifying") {
@@ -371,6 +414,7 @@ export function AppUpdateProvider({
       }
       throw new Error("下载等待超时，请检查 NAS 网络后重试。");
     } catch (error) {
+      updateActiveRef.current = false;
       setStatus("error");
       setMessage(
         error instanceof Error ? error.message : "安装包下载失败，请稍后重试。",

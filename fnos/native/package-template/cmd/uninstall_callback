@@ -1,5 +1,5 @@
 #!/bin/bash
 
-### This script is called after the user uninstalls the application.
-
+set -eu
+rm -f /etc/sudoers.d/fnnotes-m0-update
 exit 0

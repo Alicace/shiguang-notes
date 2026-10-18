@@ -1,0 +1,39 @@
+#!/bin/bash
+
+set -eu
+
+: "${TRIM_PKGVAR:?}" "${TRIM_USERNAME:?}" "${TRIM_GROUPNAME:?}"
+UPDATE_DIR="$TRIM_PKGVAR/updates"
+RULE_FILE="/etc/sudoers.d/fnnotes-m0-update"
+
+mkdir -p "$UPDATE_DIR"
+chown "$TRIM_USERNAME:$TRIM_GROUPNAME" "$UPDATE_DIR"
+chmod 700 "$UPDATE_DIR"
+
+CLI=""
+for candidate in \
+  /var/apps/appcenter/target/bin/appcenter-cli \
+  /usr/local/bin/appcenter-cli \
+  /usr/bin/appcenter-cli \
+  /usr/sbin/appcenter-cli
+do
+  if [ -x "$candidate" ]; then
+    CLI="$candidate"
+    break
+  fi
+done
+
+if [ -z "$CLI" ] || [ ! -d /etc/sudoers.d ] || ! command -v visudo >/dev/null 2>&1; then
+  exit 0
+fi
+
+TEMP_RULE="$(mktemp /tmp/fnnotes-m0-sudoers.XXXXXX)"
+trap 'rm -f "$TEMP_RULE"' EXIT
+
+cat >"$TEMP_RULE" <<EOF
+# Managed by 拾光便签. Allows only signed-in self-update installs from this app's update directory.
+$TRIM_USERNAME ALL=(root) NOPASSWD: $CLI install-fpk $UPDATE_DIR/fnnotes-m0-current.fpk
+EOF
+
+visudo -cf "$TEMP_RULE" >/dev/null
+install -o root -g root -m 440 "$TEMP_RULE" "$RULE_FILE"

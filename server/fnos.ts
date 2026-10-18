@@ -25,6 +25,7 @@ import {
   fetchLatestUpdate,
   type UpdateDownloadProgress,
 } from "./updates/native-update.js";
+import { startAppcenterInstall } from "./updates/native-installer.js";
 import metadata from "../src/native/metadata.json" with { type: "json" };
 
 export const nativeMode = process.env.FNOS_NATIVE === "1";
@@ -330,7 +331,7 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
     progress: UpdateDownloadProgress;
     repeated: boolean;
     source?: string;
-    status: "queued" | "downloading" | "ready" | "error";
+    status: "queued" | "downloading" | "ready" | "installing" | "error";
     version: string;
   };
   const updateJobs = new Map<string, UpdateJob>();
@@ -416,6 +417,62 @@ export function installNativeRoutes(app: Express, spaces: NativeSpaces, store: N
       status: job.status,
       version: job.version,
     });
+  });
+  app.post("/api/fnos/update/install", async (request, response) => {
+    if (!requireNativeAdmin(response)) return;
+    const jobId = String(request.body?.jobId || "");
+    const job = updateJobs.get(jobId);
+    if (!job || job.ownerId !== nativeContext.getStore()!.user.id) {
+      response.status(404).json({ error: "更新任务不存在或已过期。" });
+      return;
+    }
+    if (job.status === "installing") {
+      response.status(202).json({ jobId, status: "installing", version: job.version });
+      return;
+    }
+    if (job.status !== "ready" || !job.path) {
+      response.status(409).json({ error: "安装包尚未下载并校验完成。" });
+      return;
+    }
+
+    try {
+      const updatesDirectory = await fs.realpath(
+        path.join(process.env.TRIM_PKGVAR!, "updates"),
+      );
+      const packagePath = await fs.realpath(job.path);
+      const relative = path.relative(updatesDirectory, packagePath);
+      if (
+        relative.startsWith("..") ||
+        path.isAbsolute(relative) ||
+        !/^fnnotes-m0_[0-9A-Za-z._-]+_x86_64\.fpk$/.test(path.basename(packagePath))
+      ) {
+        response.status(400).json({ error: "安装包不在允许的更新目录中。" });
+        return;
+      }
+      const installPath = path.join(updatesDirectory, "fnnotes-m0-current.fpk");
+      await fs.rm(installPath, { force: true });
+      await fs.copyFile(packagePath, installPath);
+      await fs.chmod(installPath, 0o600);
+      job.status = "installing";
+      job.error = undefined;
+      response.status(202).json({ jobId, status: "installing", version: job.version });
+      // 先让浏览器收到响应；应用中心开始升级后会停止当前服务。
+      setTimeout(() => {
+        void startAppcenterInstall(installPath, process.env.TRIM_PKGVAR!)
+          .catch((error) => {
+            job.status = "error";
+            job.error = error instanceof Error
+              ? error.message
+              : "飞牛应用中心升级失败。";
+          });
+      }, 500).unref();
+    } catch (error) {
+      response.status(500).json({
+        error: error instanceof Error
+          ? error.message
+          : "无法启动飞牛应用中心升级。",
+      });
+    }
   });
   app.get("/api/session", async (_request, response) => { const ctx = nativeContext.getStore()!; response.json({ user: { uid: ctx.uid, username: ctx.user.username, isAdmin: ctx.isAdmin }, simulation: process.env.FNOS_SIMULATION === "1", systemApiConfigured: Boolean(await systemApiToken()) }); });
   // 没有系统凭据时不能装作成功：明确告诉前端「未就绪」，界面据此给出可操作的提示。

@@ -100,9 +100,9 @@ export function AppUpdatePrompt() {
             <div className="app-update-progress-heading">
               <strong>
                 {update.status === "waiting-restart"
-                  ? "正在等待安装完成"
+                  ? "正在等待升级完成"
                   : update.status === "installing"
-                    ? "正在启动安装器"
+                    ? "正在应用更新"
                     : update.status === "ready"
                       ? "安装包已校验"
                       : "正在下载并校验"}
