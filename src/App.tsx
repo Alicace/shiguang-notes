@@ -776,16 +776,18 @@ export default function App() {
       return;
     }
 
+    let refreshing = false;
     const hasPendingLocalSave = () =>
       (isNative && cloudFailureRef.current) ||
       cloudSaveTimeoutRef.current !== null ||
       cloudSaveQueueRef.current?.isSaving() === true;
 
-    const intervalId = window.setInterval(() => {
-      if (hasPendingLocalSave()) {
+    const refreshFromCloud = () => {
+      if (refreshing || hasPendingLocalSave()) {
         return;
       }
 
+      refreshing = true;
       void getCloudWorkspace()
         .then((cloud) => {
           if (
@@ -810,11 +812,25 @@ export default function App() {
             error instanceof Error ? error.message : "跨端同步检查失败。",
           );
           setCloudSyncState("failed");
+        })
+        .finally(() => {
+          refreshing = false;
         });
-    }, CLOUD_POLL_INTERVAL_MS);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshFromCloud();
+    };
+    const intervalId = window.setInterval(
+      refreshFromCloud,
+      CLOUD_POLL_INTERVAL_MS,
+    );
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", refreshFromCloud);
 
     return () => {
       window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", refreshFromCloud);
     };
   }, [authUser, replaceWorkspace]);
 
@@ -1893,6 +1909,14 @@ export default function App() {
 
     if (!canUseCloudWorkspace(authUser) || authStatus !== "ready") {
       return true;
+    }
+
+    if (cloudHydratedUserIdRef.current !== authUser.id) {
+      setCloudSyncState("syncing");
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        if (cloudHydratedUserIdRef.current === authUser.id) break;
+        await new Promise((resolve) => window.setTimeout(resolve, 100));
+      }
     }
 
     if (cloudHydratedUserIdRef.current !== authUser.id) {

@@ -1,16 +1,16 @@
 {
-  "version": "0.9.3",
-  "release_url": "https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.3",
-  "published_at": "2026-10-17",
-  "release_notes": "- 修复本地目录授权：宿主选择器返回的目录现在可以保存，并在刷新、重开应用和切换共享空间后恢复。\n- 修复共享空间：创建后自动展开名称和成员管理；成员账号列表支持刷新，也可直接按 NAS UID 邀请。\n- 修复关于页版本检查：兼容不同飞牛宿主返回的目录/清单格式，并增加国内加速线路回退。\n- 更新提示内容精简为关键变更，详细记录仍可在完整发布页查看。\n- 集中修复鉴权、ACL、路径读取、远端图片、导出和安装包校验问题。",
+  "version": "0.9.4",
+  "release_url": "https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.4",
+  "published_at": "2026-10-18",
+  "release_notes": "- 修复管理员创建的普通账号在飞牛 WebView 中无法登录的问题。\n- 支持其他 NAS 用户进入各自租户；只有 NAS 管理员账号拥有管理权限。\n- 修复手机端保存按钮和手机、桌面之间的双向同步。",
   "asset": {
-    "name": "fnnotes-m0_0.9.3_x86_64.fpk",
-    "size": 73161750,
-    "sha256": "9ed052a7779e8d12a7521d4b91c897eeb7ce3d9d044296d3674b6b9ba65066a0",
+    "name": "fnnotes-m0_0.9.4_x86_64.fpk",
+    "size": 69389802,
+    "sha256": "925c3b03a2dfe0cb718df13a4a0e6a1c61aae0bd57f646304a928bc3b5688bd0",
     "urls": [
-      "https://github.com/Alicace/shiguang-notes/releases/download/v0.9.3/fnnotes-m0_0.9.3_x86_64.fpk",
-      "https://ghfast.top/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.3/fnnotes-m0_0.9.3_x86_64.fpk",
-      "https://gh-proxy.com/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.3/fnnotes-m0_0.9.3_x86_64.fpk"
+      "https://github.com/Alicace/shiguang-notes/releases/download/v0.9.4/fnnotes-m0_0.9.4_x86_64.fpk",
+      "https://ghfast.top/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.4/fnnotes-m0_0.9.4_x86_64.fpk",
+      "https://gh-proxy.com/https://github.com/Alicace/shiguang-notes/releases/download/v0.9.4/fnnotes-m0_0.9.4_x86_64.fpk"
     ]
   }
 }

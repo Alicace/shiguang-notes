@@ -1,4 +1,5 @@
 async (page) => {
+  await page.unrouteAll({ behavior: "wait" });
   const base = "http://127.0.0.1:18338/app/fnnotes-m0/";
   const adminBase = "http://127.0.0.1:18340/app/fnnotes-m0/";
   await page.setViewportSize({ width: 1366, height: 900 });

@@ -182,6 +182,28 @@ async (page) => {
     await tenantContext.close();
   }
 
+  // 同一个应用账号在 NAS 管理员窗口登录，也仍然是普通租户，不继承网关管理员权限。
+  const adminAppContext = await page.context().browser().newContext();
+  try {
+    const adminApp = await adminAppContext.newPage();
+    await enterApp(adminApp, adminBase, false);
+    await loginWithPassword(adminApp, username, createdBody.initialPassword);
+    await adminApp.locator(".editor-panel").waitFor({ timeout: 20000 });
+    const nativeAdminState = await (
+      await adminApp.request.get(adminBase + "api/session")
+    ).json();
+    if (nativeAdminState.user.isAdmin !== false) {
+      throw new Error("应用自建账号在管理员窗口登录后继承了管理员权限。");
+    }
+    await adminApp.getByRole("button", { name: "打开设置", exact: true }).click();
+    await adminApp.getByRole("button", { name: "账号与同步", exact: true }).click();
+    if (await adminApp.locator('section[aria-label="用户管理"]').count()) {
+      throw new Error("应用自建账号看到了用户管理。");
+    }
+  } finally {
+    await adminAppContext.close();
+  }
+
   const adminWorkspaceAfter = await page.evaluate(async () => (await (await fetch("/app/fnnotes-m0/api/workspace")).json()).workspace.notes[0].markdown);
   if (adminWorkspaceAfter !== adminWorkspace) throw new Error("独立租户的写入污染了 NAS 账号的私有便签。");
 
@@ -259,6 +281,7 @@ async (page) => {
       "普通 NAS 账号修改密码时校验旧密码，成功后旧密码失效",
       "管理员建号并显示一次性密码",
       "独立账号登录后是空租户且写入不污染 NAS 账号",
+      "应用账号在管理员窗口登录仍是普通用户",
       "重置密码后旧密码失效、新密码可用",
       "停用后无法登录、启用后恢复",
       "删除账号后无法登录且不影响其它租户",

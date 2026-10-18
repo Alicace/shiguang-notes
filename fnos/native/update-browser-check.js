@@ -2,22 +2,22 @@ async (page) => {
   const base = "http://127.0.0.1:18338/app/fnnotes-m0/";
   const adminBase = "http://127.0.0.1:18340/app/fnnotes-m0/";
   const manifest = {
-    currentVersion: "0.9.3",
+    currentVersion: "0.9.4",
     hasUpdate: true,
     installable: true,
     latest: {
-      version: "0.9.4",
+      version: "0.9.5",
       publishedAt: "2026-10-17",
       releaseNotes:
         "自动检查更新\n下载进度与实时速度\n自动校验并打开飞牛安装器",
       releaseUrl:
-        "https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.4",
+        "https://github.com/Alicace/shiguang-notes/releases/tag/v0.9.5",
       asset: {
-        name: "fnnotes-m0_0.9.4_x86_64.fpk",
+        name: "fnnotes-m0_0.9.5_x86_64.fpk",
         size: 1024,
         sha256: "a".repeat(64),
         urls: [
-          "https://github.com/Alicace/shiguang-notes/releases/download/v0.9.4/fnnotes-m0_0.9.4_x86_64.fpk",
+          "https://github.com/Alicace/shiguang-notes/releases/download/v0.9.5/fnnotes-m0_0.9.5_x86_64.fpk",
         ],
       },
     },
@@ -31,12 +31,10 @@ async (page) => {
   await page.route("**/api/fnos/update", updateRoute);
   await page.route("**/api/fnos/update?force=1", updateRoute);
   await page.addInitScript(() => {
-    if (sessionStorage.getItem("update-check-initialized") === "yes") return;
     localStorage.removeItem("notes.nativeLogin");
     localStorage.setItem("notes.nativeLoginLoggedOut", "yes");
     localStorage.removeItem("shiguang.update.lastCheckedAt");
     localStorage.removeItem("shiguang.update.intervalHours");
-    sessionStorage.setItem("update-check-initialized", "yes");
   });
   await page.setViewportSize({ width: 1366, height: 760 });
   await page.goto(base);
@@ -61,7 +59,7 @@ async (page) => {
   }
 
   // 不打开设置，登录进入工作区后自动检查并弹出新版本。
-  await page.getByRole("dialog", { name: /拾光便签 0\.9\.4/ }).waitFor({
+  await page.getByRole("dialog", { name: /拾光便签 0\.9\.5/ }).waitFor({
     timeout: 12000,
   });
   await page.getByText("查看更新内容", { exact: true }).click();
@@ -103,7 +101,7 @@ async (page) => {
       return route.fulfill({
         status: 202,
         contentType: "application/json",
-        body: JSON.stringify({ jobId: "update-job", version: "0.9.4" }),
+        body: JSON.stringify({ jobId: "update-job", version: "0.9.5" }),
       });
     });
     await adminPage.route("**/api/fnos/update/download/update-job", async (route) => {
@@ -123,7 +121,7 @@ async (page) => {
             },
             repeated: false,
             status: "downloading",
-            version: "0.9.4",
+            version: "0.9.5",
           }),
         });
       }
@@ -143,7 +141,7 @@ async (page) => {
             },
             repeated: false,
             status: "downloading",
-            version: "0.9.4",
+            version: "0.9.5",
           }),
         });
       }
@@ -151,7 +149,7 @@ async (page) => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          path: "/tmp/fnnotes-m0_0.9.4_x86_64.fpk",
+          path: "/tmp/fnnotes-m0_0.9.5_x86_64.fpk",
           progress: {
             percent: 100,
             receivedBytes: 1024,
@@ -163,16 +161,14 @@ async (page) => {
           repeated: false,
           source: "gh-proxy.com",
           status: "ready",
-          version: "0.9.4",
+          version: "0.9.5",
         }),
       });
     });
     await adminPage.addInitScript(() => {
-      if (sessionStorage.getItem("update-check-initialized") === "yes") return;
       localStorage.removeItem("notes.nativeLogin");
       localStorage.setItem("notes.nativeLoginLoggedOut", "yes");
       localStorage.removeItem("shiguang.update.lastCheckedAt");
-      sessionStorage.setItem("update-check-initialized", "yes");
     });
     await adminPage.goto(adminBase);
     await adminPage.locator(".login-dialog-nas-button").waitFor({ timeout: 20000 });
@@ -180,10 +176,10 @@ async (page) => {
     await adminPage.locator(".confirm-dialog-actions .primary").click();
     await adminPage.locator(".app-layout").waitFor({ timeout: 20000 });
     await adminPage
-      .getByRole("dialog", { name: /拾光便签 0\.9\.4/ })
+      .getByRole("dialog", { name: /拾光便签 0\.9\.5/ })
       .waitFor({ timeout: 12000 });
     await adminPage
-      .getByRole("button", { name: /下载并更新到 0\.9\.4/ })
+      .getByRole("button", { name: /下载并更新到 0\.9\.5/ })
       .click();
     const progress = adminPage.getByRole("progressbar", {
       name: "更新下载进度",
@@ -218,7 +214,7 @@ async (page) => {
     automaticCheck: true,
     intervalHours: 24,
     progress: true,
-    update: "0.9.3 → 0.9.4",
+    update: "0.9.4 → 0.9.5",
     adminDownload: true,
   };
 }

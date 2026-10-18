@@ -126,6 +126,17 @@ export function installNativeGateway(app: Express, store: NotesDataStore, spaces
     if (account.disabled) { response.status(403).json({ error: "该账号已被停用，请联系管理员。" }); return; }
     const user: AuthSession = { id: account.id, username: account.username, role: "user", remember: false, passwordVersion: account.passwordVersion };
     response.setHeader("X-Shiguang-User", user.id);
+    // 应用自建账号即使由 NAS 管理员窗口打开，也只能获得普通用户权限；
+    // 只有当前网关账号本身是 NAS 管理员，且登录的是对应 NAS 租户时才放行管理接口。
+    const isAdmin = identity.isAdmin && account.id === gatewayAccount.id;
+    const validWriteProof =
+      request.get("x-shiguang-user") === user.id &&
+      (() => {
+        const token = request.get("x-fnnotes-csrf") || "";
+        const expected = createNativeCsrfToken(identity.uid);
+        return /^[a-f0-9]{64}$/.test(token) &&
+          timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+      })();
     const authorization = request.get("authorization");
     if (authorization) {
       const token = authorization.match(/^Bearer\s+(\S+)$/i)?.[1];
@@ -133,12 +144,11 @@ export function installNativeGateway(app: Express, store: NotesDataStore, spaces
       if (!credential || credential.id !== user.id || credential.passwordVersion !== account.passwordVersion || credential.skillTokenVersion !== account.skillTokenVersion) { response.status(403).json({ error: "应用 Token 与当前 NAS 登录用户不匹配或已失效。" }); return; }
     }
     if (credentialPaths.has(request.path)) {
-      if (!isSameOrigin(request)) { response.status(403).json({ error: "请从拾光便签页面登录。" }); return; }
+      // 飞牛 WebView 可能发送 app:// Origin 或省略 Origin。应用自己的
+      // 登录/退出请求会带当前网关派生的 CSRF 与账号绑定，可作为同源证明。
+      if (!isSameOrigin(request) && !validWriteProof) { response.status(403).json({ error: "请从拾光便签页面登录。" }); return; }
     } else if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
-      if (request.get("x-shiguang-user") !== user.id) { response.status(403).json({ error: "NAS 账号已变化或身份绑定缺失，请重新打开应用。" }); return; }
-      const token = request.get("x-fnnotes-csrf") || "";
-      const expected = createNativeCsrfToken(identity.uid);
-      if (!/^[a-f0-9]{64}$/.test(token) || !timingSafeEqual(Buffer.from(token), Buffer.from(expected))) { response.status(403).json({ error: "写入校验失败：会话令牌已失效，请刷新应用后重试。" }); return; }
+      if (!validWriteProof) { response.status(403).json({ error: "写入校验失败：会话令牌已失效，请刷新应用后重试。" }); return; }
     }
     const selected = request.get("x-shiguang-space") || user.id;
     const access = await spaces.access(user.id, selected);
@@ -146,9 +156,9 @@ export function installNativeGateway(app: Express, store: NotesDataStore, spaces
     const appPassword = isSessionRequest ? await store.hasAppPassword(user.id) : false;
     if (!access) { response.status(403).json({ error: "共享空间权限已撤销或空间不存在。" }); return; }
     if (!access.writable && ((request.path === "/api/workspace" && request.method === "PUT") || request.path === "/api/images/import")) { response.status(403).json({ error: "当前共享空间为只读。" }); return; }
-    nativeContext.run({ user, uid: identity.uid, isAdmin: identity.isAdmin, scope: selected, writable: access.writable }, () => {
+    nativeContext.run({ user, uid: identity.uid, isAdmin, scope: selected, writable: access.writable }, () => {
       if (request.path === "/api/auth/session") {
-        response.json({ user, requireLogin: true, native: true, csrfToken: createNativeCsrfToken(identity.uid), scope: selected, writable: access.writable, nasAdmin: identity.isAdmin, appPassword }); return;
+        response.json({ user, requireLogin: true, native: true, csrfToken: createNativeCsrfToken(identity.uid), scope: selected, writable: access.writable, nasAdmin: isAdmin, appPassword }); return;
       }
       if (request.path.startsWith("/api/superadmin/")) { response.status(409).json({ error: "请在「设置 → 飞牛与诊断 → 用户管理」中管理账号。" }); return; }
       if (request.path === "/api/export") { response.status(409).json({ error: "请使用拾光便签客户端生成 PNG；原生服务不运行截图浏览器。" }); return; }

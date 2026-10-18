@@ -73,6 +73,63 @@ test("WebView 使用非 HTTP Origin 时，正确 CSRF 仍可保存", async () =>
   assert.equal(saved.status, 200);
   assert.equal((await request("/api/workspace")).data.workspace.notes[0].markdown, "WebView 来源可写");
 });
+test("NAS 其他用户是普通租户，应用账号不会继承管理员权限", async () => {
+  const adminToken = await session(1003);
+  assert.equal((await request("/api/session", { uid: 1003 })).data.user.isAdmin, true);
+  assert.equal((await request("/api/session", { uid: 1007 })).data.user.isAdmin, false);
+  assert.equal((await request("/api/fnos/users", { uid: 1007 })).status, 403);
+  assert.equal((await request("/api/fnos/users", { uid: 1003 })).status, 200);
+
+  const username = `origin-app-${Date.now().toString().slice(-6)}`;
+  const created = await request("/api/fnos/users", {
+    uid: 1003,
+    method: "POST",
+    token: adminToken,
+    body: { username },
+  });
+  assert.equal(created.status, 201);
+
+  // 飞牛 WebView 的 app:// Origin 没有同源证明，应用登录请求改用 CSRF 与账号绑定校验。
+  const login = await request("/api/auth/login", {
+    uid: 1003,
+    method: "POST",
+    token: adminToken,
+    extra: { Origin: "app://fnnotes" },
+    body: {
+      username,
+      password: created.data.initialPassword,
+      remember: true,
+    },
+  });
+  assert.equal(login.status, 200);
+  const cookie = (login.headers["set-cookie"] || [])
+    .map((value) => value.split(";")[0])
+    .join("; ");
+  const appSession = await request("/api/auth/session", {
+    uid: 1003,
+    extra: { Cookie: cookie },
+  });
+  assert.equal(appSession.data.user.id, created.data.user.id);
+  assert.equal(
+    (await request("/api/session", { uid: 1003, extra: { Cookie: cookie } }))
+      .data.user.isAdmin,
+    false,
+  );
+  assert.equal(
+    (await request("/api/fnos/users", { uid: 1003, extra: { Cookie: cookie } }))
+      .status,
+    403,
+  );
+
+  assert.equal(
+    (await request(`/api/fnos/users/${created.data.user.id}`, {
+      uid: 1003,
+      method: "DELETE",
+      token: adminToken,
+    })).status,
+    200,
+  );
+});
 test("共享空间所有者、编辑、只读和撤销均由服务器强制执行", async () => {
   const tokenA = await session(); const tokenB = await session(1002); const tokenAdmin = await session(1003);
   const space = (await request("/api/fnos/spaces", { method: "POST", token: tokenA, body: { name: "授权共享测试" } })).data;

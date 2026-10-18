@@ -32,7 +32,7 @@ test("CHANGELOG 使用固定的人类可读格式记录版本", () => {
   assert.match(changelog, /^# 更新日志\n/);
   assert.equal(
     secondLevelHeadings[hasUnreleasedSection ? 1 : 0],
-    "[0.9.3] - 2026-10-18",
+    "[0.9.4] - 2026-10-18",
   );
   assert.ok(
     secondLevelHeadings.includes(`[${packageVersion.version}] - 2026-10-11`),
